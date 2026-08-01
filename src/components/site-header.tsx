@@ -16,7 +16,7 @@ export function SiteHeader() {
     <nav className="sticky top-0 z-50 w-full border-b border-navy/5 bg-white/80 px-6 py-4 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-8">
-          <img src="/src/assets/logo.png" alt="Logo" className="h-7 w-21" />
+          <img src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He" alt="Logo" className="h-7 w-21" />
           <div className="hidden items-center gap-6 text-sm font-medium text-navy/60 md:flex">
             {links.map((l) => (
               <a key={l.label} href={l.to} className="transition-colors hover:text-brand">

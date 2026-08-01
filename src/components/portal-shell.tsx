@@ -124,7 +124,7 @@ export function PortalShell({
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-navy/5 px-5">
-          <img src="/src/assets/logo.png" alt="Logo" className="h-8 w-25" />
+          <img src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He" alt="Logo" className="h-8 w-25" />
         </div>
 
         <div className="p-4">
