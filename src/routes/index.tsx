@@ -51,7 +51,7 @@ function Hero() {
       <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-2">
         <div className="animate-fade-up">
           <span className="mb-6 inline-block rounded-full bg-brand/10 px-4 py-1.5 text-xs font-bold tracking-widest uppercase text-brand">
-            Digital Freight Forwarding
+            Digital Freight Forwarding Solutions
           </span>
           <h1 className="mb-8 text-5xl leading-[1.1] font-bold tracking-tight lg:text-7xl">
             Global Shipping <br />
@@ -184,7 +184,7 @@ function DashboardPreview() {
                 <TrackingRow
                   code="VC-2026-000001"
                   route="Guangzhou → Tema"
-                  method="Sea Freight | 40ft Container"
+                  method="Ocean Freight | 40ft Container"
                   status="Port Clearance"
                   statusTone="green"
                   eta="Oct 24, 2026"
@@ -202,7 +202,7 @@ function DashboardPreview() {
                 <TrackingRow
                   code="VC-2026-000002"
                   route="Yiwu → Tema"
-                  method="Sea Freight | LCL"
+                  method="Ocean Freight | LCL"
                   status="Quality Inspection"
                   statusTone="orange"
                   eta="Nov 02, 2026"
@@ -305,7 +305,7 @@ const services = [
   },
   {
     icon: Anchor,
-    title: "Sea Freight",
+    title: "Ocean Freight",
     desc: "FCL and LCL solutions with weekly sailings and competitive rates.",
   },
   {
@@ -315,7 +315,7 @@ const services = [
   },
   {
     icon: Truck,
-    title: "Door Delivery",
+    title: "Door to Door Delivery",
     desc: "Last-mile delivery across Ghana with proof-of-delivery and signature capture.",
   },
   {
@@ -372,12 +372,12 @@ function Features() {
           />
           <FeatureCard
             title="LCL Consolidation"
-            desc="Save costs by grouping shipments. We manage container loading, manifest generation, and sea freight."
+            desc="Save costs by grouping shipments. We manage container loading, manifest generation, and Ocean Freight."
             img={consImg}
           />
           <FeatureCard
             title="Real-time Tracking"
-            desc="From Shenzhen departure to Tema clearance. Every milestone tracked with automated alerts."
+            desc="From China departure to Ghana clearance. Every milestone tracked with automated alerts."
             img={trackImg}
           />
         </div>
@@ -453,17 +453,17 @@ const tiers = [
     ],
   },
   {
-    name: "Sea LCL",
+    name: "Ocean LCL",
     price: "$450",
     unit: "/ CBM",
     features: ["Weekly sailings", "Consolidation service", "QC inspection", "Customs clearance"],
     featured: true,
   },
   {
-    name: "Sea FCL",
+    name: "Ocean FCL",
     price: "Custom",
     unit: "20ft / 40ft",
-    features: ["Full container", "Dedicated route", "End-to-end handling", "Door delivery"],
+    features: ["Full container", "Dedicated route", "End-to-end handling", "Door to Door Delivery"],
   },
 ];
 
@@ -537,7 +537,7 @@ const testimonials = [
     name: "Fatima Osei",
     role: "Founder, Osei Auto Parts",
     quote:
-      "Consolidation dropped my sea freight bills by 40%. The Paystack invoicing makes payments frictionless.",
+      "Consolidation dropped my Ocean Freight bills by 40%. The Paystack invoicing makes payments frictionless.",
   },
 ];
 
@@ -570,7 +570,7 @@ function Testimonials() {
 const faqs = [
   {
     q: "How long does shipping from China to Ghana take?",
-    a: "Air freight typically takes 3–5 business days. Sea LCL takes 30–45 days depending on port schedules and consolidation.",
+    a: "Air freight typically takes 3–5 business days. Ocean LCL takes 30–45 days depending on port schedules and consolidation.",
   },
   {
     q: "How do I get my consignment code?",
@@ -629,7 +629,7 @@ function Contact() {
           <ContactCard icon={Phone} label="Phone" value="+233 30 200 0000" />
         </div>
         <div className="mt-10 flex items-center justify-center gap-2 text-sm text-navy/50">
-          <MapPin className="h-4 w-4" /> Head Office, Accra Business Park, Ghana
+          <MapPin className="h-4 w-4" /> Head Office, East Legon, Ghana
         </div>
       </div>
     </section>

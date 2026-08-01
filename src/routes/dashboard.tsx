@@ -350,7 +350,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { label: "Air Freight", value: "Air" as const },
-                    { label: "Sea Freight", value: "Sea" as const },
+                    { label: "Ocean Freight", value: "Sea" as const },
                   ].map((m) => (
                     <button
                       key={m.value}

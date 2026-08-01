@@ -23,7 +23,7 @@ export function SiteFooter() {
             <h5 className="mb-6 font-bold">Services</h5>
             <ul className="space-y-4 text-sm text-white/60">
               <li>Air Freight</li>
-              <li>Sea Freight</li>
+              <li>Ocean Freight</li>
               <li>Customs Clearance</li>
               <li>Warehouse QC</li>
               <li>Cargo Insurance</li>
