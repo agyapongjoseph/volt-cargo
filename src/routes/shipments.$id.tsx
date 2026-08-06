@@ -1,15 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import { PortalShell } from "@/components/portal-shell";
 import {
   findShipment,
+  getShipmentEvents,
+  getShipmentMessages,
   initiateInvoicePayment,
+  sendShipmentMessage,
   STATUS_LABEL,
   STATUS_ORDER,
   statusColor,
 } from "@/lib/data";
-import { CheckCircle2, Circle, MapPin, FileText, MessageSquare } from "lucide-react";
+import { CheckCircle2, Circle, MapPin, MessageSquare, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/shipments/$id")({
@@ -21,6 +24,8 @@ export const Route = createFileRoute("/shipments/$id")({
 
 function ShipmentDetail() {
   const { id } = Route.useParams();
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState("");
   const {
     data: shipment,
     isLoading,
@@ -29,7 +34,22 @@ function ShipmentDetail() {
     queryKey: ["shipment", id],
     queryFn: () => findShipment(id),
   });
+  const { data: events = [] } = useQuery({
+    queryKey: ["shipment-events", id],
+    queryFn: () => getShipmentEvents(id),
+  });
+  const { data: messages = [] } = useQuery({
+    queryKey: ["shipment-messages", id],
+    queryFn: () => getShipmentMessages(id),
+  });
   const paymentMutation = useMutation({ mutationFn: initiateInvoicePayment });
+  const messageMutation = useMutation({
+    mutationFn: () => sendShipmentMessage(id, message),
+    onSuccess: async () => {
+      setMessage("");
+      await queryClient.invalidateQueries({ queryKey: ["shipment-messages", id] });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -53,6 +73,7 @@ function ShipmentDetail() {
   }
 
   const currentIdx = STATUS_ORDER.indexOf(shipment.status);
+  const eventByStatus = new Map(events.map((event) => [event.status, event]));
 
   return (
     <PortalShell
@@ -95,9 +116,14 @@ function ShipmentDetail() {
                     <div className={cn("pb-2", !done && "opacity-50")}>
                       <p className="text-sm font-semibold">{STATUS_LABEL[s]}</p>
                       <p className="text-xs text-navy/50">
-                        {done ? "Completed" : "Pending"}
+                        {eventByStatus.get(s)?.note ?? (done ? "Completed" : "Pending")}
                         {current && " • current"}
                       </p>
+                      {eventByStatus.get(s)?.createdAt && (
+                        <p className="text-[11px] text-navy/35">
+                          {new Date(eventByStatus.get(s)!.createdAt).toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </li>
                 );
@@ -106,57 +132,43 @@ function ShipmentDetail() {
           </div>
 
           <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold">Documents</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                "Commercial Invoice.pdf",
-                "Packing List.pdf",
-                "Bill of Lading.pdf",
-                "Customs Declaration.pdf",
-              ].map((doc) => (
-                <div
-                  key={doc}
-                  className="flex items-center gap-3 rounded-xl border border-navy/5 bg-surface p-3"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{doc}</p>
-                    <p className="text-xs text-navy/50">PDF • 240 KB</p>
-                  </div>
-                  <button className="text-xs font-semibold text-brand hover:underline">View</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-base font-semibold">Messages</h2>
             <div className="space-y-3">
-              {[
-                {
-                  from: "VoltCargo Ops",
-                  msg: "Your shipment cleared quality control this morning.",
-                  time: "2h ago",
-                },
-                { from: "You", msg: "Please confirm consolidation timeline.", time: "1d ago" },
-              ].map((m, i) => (
-                <div key={i} className="flex gap-3">
+              {messages.map((m) => (
+                <div key={m.id} className="flex gap-3">
                   <MessageSquare className="mt-1 h-4 w-4 text-navy/30" />
-                  <div className="flex-1 rounded-xl bg-surface p-3">
+                  <div
+                    className={cn("flex-1 rounded-xl p-3", m.mine ? "bg-brand/10" : "bg-surface")}
+                  >
                     <p className="text-xs font-semibold text-navy">
-                      {m.from} <span className="ml-2 font-normal text-navy/40">{m.time}</span>
+                      {m.author}{" "}
+                      <span className="ml-2 font-normal text-navy/40">
+                        {new Date(m.createdAt).toLocaleString()}
+                      </span>
                     </p>
-                    <p className="mt-1 text-sm text-navy/70">{m.msg}</p>
+                    <p className="mt-1 text-sm text-navy/70">{m.body}</p>
                   </div>
                 </div>
               ))}
+              {messages.length === 0 && (
+                <p className="rounded-xl bg-surface p-4 text-sm text-navy/50">
+                  No messages yet. Send a note to VoltCargo operations.
+                </p>
+              )}
               <textarea
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
                 placeholder="Send a message to ops team…"
                 className="w-full rounded-xl border border-navy/10 bg-white p-3 text-sm focus:border-brand focus:outline-none"
                 rows={2}
               />
+              <button
+                onClick={() => message.trim() && messageMutation.mutate()}
+                disabled={!message.trim() || messageMutation.isPending}
+                className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90 disabled:opacity-60"
+              >
+                {messageMutation.isPending ? "Sending..." : "Send message"}
+              </button>
             </div>
           </div>
         </div>
@@ -170,19 +182,28 @@ function ShipmentDetail() {
               <Row label="Consignment" value={shipment.code} />
               <Row label="Mode" value={shipment.mode} />
               <Row label="Pieces" value={shipment.pieces} />
-              <Row label="Weight" value={`${shipment.weightKg} kg`} />
-              <Row label="Volume" value={`${shipment.cbm} CBM`} />
-              <Row label="Declared value" value={`$${shipment.declaredValue.toLocaleString()}`} />
+              {shipment.mode === "Air" ? (
+                <Row label="Weight" value={`${shipment.weightKg} kg`} />
+              ) : (
+                <Row label="Volume" value={`${shipment.cbm} CBM`} />
+              )}
+              <Row label="Estimated value" value={`$${shipment.declaredValue.toLocaleString()}`} />
               <Row label="Created" value={shipment.createdAt} />
-              <Row label="ETA" value={shipment.eta} />
+              <Row label="ETA" value={shipment.eta || "Pending"} />
             </dl>
           </div>
 
           <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold">Invoice</h3>
-            <p className="mt-2 text-3xl font-bold">${shipment.invoiceTotal}</p>
+            <p className="mt-2 text-3xl font-bold">
+              {shipment.invoiceTotal ? `$${shipment.invoiceTotal.toLocaleString()}` : "Pending"}
+            </p>
             <p className="text-xs text-navy/50">
-              {shipment.paid ? "Paid in full" : "Payment due before release"}
+              {shipment.invoiceTotal
+                ? shipment.paid
+                  ? "Paid in full"
+                  : "Payment due in Ghana before release"
+                : "Invoice is issued when goods arrive in Ghana"}
             </p>
             {!shipment.paid && (
               <button
@@ -203,10 +224,30 @@ function ShipmentDetail() {
             <h3 className="mb-3 flex items-center gap-2 text-base font-semibold">
               <MapPin className="h-4 w-4 text-brand" /> Route
             </h3>
-            <div className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-brand/10 via-surface to-accent-green/10">
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-navy/40">
-                Live map preview (activate with Lovable Cloud)
-              </div>
+            <div className="space-y-3">
+              {[
+                shipment.origin,
+                shipment.mode === "Air" ? "Air freight corridor" : "Ocean freight corridor",
+                shipment.destination,
+              ].map((point, index) => (
+                <div
+                  key={`${point}-${index}`}
+                  className="flex items-center gap-3 rounded-xl bg-surface p-3"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
+                    {index + 1}
+                  </div>
+                  <p className="text-sm font-medium text-navy">{point}</p>
+                </div>
+              ))}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(shipment.destination)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy/90"
+              >
+                <Navigation className="h-4 w-4" /> Open destination map
+              </a>
             </div>
           </div>
         </div>

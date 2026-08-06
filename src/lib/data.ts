@@ -103,6 +103,20 @@ export type TeamUser = {
   role: string;
 };
 
+export type ShipmentEvent = {
+  status: ShipmentStatus;
+  note: string;
+  createdAt: string;
+};
+
+export type ShipmentMessage = {
+  id: string;
+  author: string;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+};
+
 export type SessionProfile = {
   user: { id: string; email: string } | null;
   client: Client | null;
@@ -115,6 +129,7 @@ export type SearchResult =
   | { kind: "none"; query: string };
 
 type ClientRow = {
+  user_id?: string;
   client_code: string;
   full_name: string;
   email: string;
@@ -159,6 +174,19 @@ type InvoiceWithShipmentRow = InvoiceRow & {
         clients: ClientRow | ClientRow[] | null;
       }[]
     | null;
+};
+
+type ShipmentEventRow = {
+  status: ShipmentStatus;
+  note: string | null;
+  created_at: string;
+};
+
+type MessageRow = {
+  id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
 };
 
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -341,6 +369,81 @@ export async function findShipment(code: string): Promise<Shipment | undefined> 
   return data ? mapShipment(data as unknown as ShipmentRow) : undefined;
 }
 
+async function getShipmentUuid(code: string): Promise<string | undefined> {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("shipments")
+    .select("id")
+    .eq("code", code.trim().toUpperCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id;
+}
+
+export async function getShipmentEvents(code: string): Promise<ShipmentEvent[]> {
+  const db = requireSupabase();
+  const shipmentId = await getShipmentUuid(code);
+  if (!shipmentId) return [];
+
+  const { data, error } = await db
+    .from("shipment_events")
+    .select("status, note, created_at")
+    .eq("shipment_id", shipmentId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  return ((data ?? []) as ShipmentEventRow[]).map((event) => ({
+    status: event.status,
+    note: event.note ?? STATUS_LABEL[event.status],
+    createdAt: event.created_at,
+  }));
+}
+
+export async function getShipmentMessages(code: string): Promise<ShipmentMessage[]> {
+  const db = requireSupabase();
+  const [{ data: auth }, shipmentId] = await Promise.all([
+    db.auth.getUser(),
+    getShipmentUuid(code),
+  ]);
+  if (!shipmentId) return [];
+
+  const { data, error } = await db
+    .from("messages")
+    .select("id, author_id, body, created_at")
+    .eq("shipment_id", shipmentId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  return ((data ?? []) as MessageRow[]).map((message) => {
+    const mine = message.author_id === auth.user?.id;
+    return {
+      id: message.id,
+      author: mine ? "You" : "VoltCargo Ops",
+      body: message.body,
+      createdAt: message.created_at,
+      mine,
+    };
+  });
+}
+
+export async function sendShipmentMessage(code: string, body: string) {
+  const db = requireSupabase();
+  const [{ data: auth, error: authError }, shipmentId] = await Promise.all([
+    db.auth.getUser(),
+    getShipmentUuid(code),
+  ]);
+  if (authError) throw authError;
+  if (!auth.user) throw new Error("Sign in before sending a message.");
+  if (!shipmentId) throw new Error("Shipment not found.");
+
+  const { error } = await db.from("messages").insert({
+    shipment_id: shipmentId,
+    author_id: auth.user.id,
+    body: body.trim(),
+  });
+  if (error) throw error;
+}
+
 export async function publicTrackShipment(code: string): Promise<Shipment | undefined> {
   const db = requireSupabase();
   const { data, error } = await db.rpc("track_shipment_public", {
@@ -404,13 +507,35 @@ export async function getInvoicesForClient(clientId: string): Promise<Invoice[]>
 
 export async function getTeamUsers(): Promise<TeamUser[]> {
   const db = requireSupabase();
-  const { data, error } = await db.from("user_roles").select("user_id, role").order("created_at");
-  if (error) throw error;
-  return ((data ?? []) as { user_id: string; role: AppRole }[]).map((row) => ({
-    name: row.user_id.slice(0, 8),
-    email: row.user_id,
-    role: ROLE_LABEL[row.role],
-  }));
+  const { data: rolesData, error: rolesError } = await db
+    .from("user_roles")
+    .select("user_id, role")
+    .order("created_at");
+  if (rolesError) throw rolesError;
+
+  const roles = (rolesData ?? []) as { user_id: string; role: AppRole }[];
+  const userIds = [...new Set(roles.map((row) => row.user_id))];
+
+  const { data: clientsData, error: clientsError } = userIds.length
+    ? await db
+        .from("clients")
+        .select("user_id, client_code, full_name, email, phone, city, created_at")
+        .in("user_id", userIds)
+    : { data: [], error: null };
+  if (clientsError) throw clientsError;
+
+  const clientsByUserId = new Map(
+    ((clientsData ?? []) as ClientRow[]).map((client) => [client.user_id, client]),
+  );
+
+  return roles.map((row) => {
+    const client = clientsByUserId.get(row.user_id);
+    return {
+      name: client?.full_name ?? "Invited user",
+      email: client?.email ?? row.user_id,
+      role: ROLE_LABEL[row.role],
+    };
+  });
 }
 
 export async function getClientDashboardData() {

@@ -13,6 +13,9 @@ import {
   Phone,
   Mail,
   MessageCircle,
+  PackageSearch,
+  ClipboardCheck,
+  Ship,
 } from "lucide-react";
 import heroImg from "@/assets/hero-cargo.jpg";
 import qcImg from "@/assets/feature-qc.jpg";
@@ -88,10 +91,18 @@ function Hero() {
           <div className="mt-8 flex items-center gap-3">
             <Link
               to="/auth"
+              search={{ mode: "signup" }}
               className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition-all hover:bg-brand/90"
             >
-              Get Started <ArrowRight className="h-4 w-4" />
+              Sign up now <ArrowRight className="h-4 w-4" />
             </Link>
+            {/* <Link
+              to="/auth"
+              search={{ mode: "signin" }}
+              className="inline-flex items-center gap-2 rounded-full border border-navy/10 px-6 py-3 text-sm font-semibold text-navy transition-colors hover:bg-white"
+            >
+              Sign in
+            </Link> */}
           </div>
         </div>
         <div className="relative animate-fade-up [animation-delay:150ms]">
@@ -128,88 +139,83 @@ function Hero() {
 
 function DashboardPreview() {
   return (
-    <section className="bg-white px-6 py-24" id="solutions">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-12 flex flex-col items-end justify-between gap-6 md:flex-row">
-          <div>
-            <h2 className="mb-2 text-3xl font-bold tracking-tight">Operational Excellence</h2>
-            <p className="text-navy/50">
-              Monitor your entire supply chain from a single workspace.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button className="rounded-lg border border-navy/10 px-4 py-2 text-sm font-medium hover:bg-surface">
-              Export Reports
-            </button>
+    <section className="overflow-hidden bg-white px-6 py-24" id="solutions">
+      <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
+        <div>
+          <span className="mb-5 inline-flex rounded-full bg-brand/10 px-4 py-1.5 text-xs font-bold tracking-widest text-brand uppercase">
+            Sourcing + Shipping
+          </span>
+          <h2 className="mb-6 text-4xl leading-tight font-bold tracking-tight lg:text-5xl">
+            Buy from China with a team that checks, ships, and delivers for you.
+          </h2>
+          <p className="mb-8 max-w-xl text-lg leading-relaxed text-navy/55">
+            VoltCargo helps importers find reliable suppliers, verify goods before payment or
+            shipment, consolidate packages, and move cargo from China to Ghana with clear tracking.
+          </p>
+          <div className="flex flex-wrap gap-3">
             <Link
               to="/auth"
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
+              className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition-colors hover:bg-brand/90"
             >
-              New Shipment
+              Request Sourcing Help <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/track"
+              className="inline-flex items-center gap-2 rounded-full border border-navy/10 px-6 py-3 text-sm font-semibold text-navy transition-colors hover:bg-surface"
+            >
+              Track Shipment
             </Link>
           </div>
         </div>
 
-        <div className="mb-12 grid gap-6 md:grid-cols-4">
-          <StatCard
-            label="Total Shipments"
-            value="1,284"
-            hint="+12.5% vs last month"
-            tone="green"
-          />
-          <StatCard label="Active Freight" value="42" hint="8 containers in transit" tone="brand" />
-          <StatCard label="Pending Clearance" value="15" hint="3 requiring action" tone="orange" />
-          <div className="rounded-2xl bg-navy p-6 text-white">
-            <p className="mb-1 text-xs font-bold tracking-widest text-white/40 uppercase">
-              Unpaid Invoices
-            </p>
-            <h3 className="text-3xl font-bold">$14,200</h3>
-            <p className="mt-4 text-xs font-semibold text-white/60">Paystack integration active</p>
-          </div>
-        </div>
+        <div className="relative">
+          <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-brand/10 blur-3xl" />
+          <div className="relative rounded-[2rem] border border-navy/5 bg-surface p-4 shadow-2xl shadow-navy/10">
+            <div className="rounded-[1.5rem] bg-navy p-6 text-white">
+              <div className="mb-8 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold tracking-widest text-white/40 uppercase">
+                    Import Request
+                  </p>
+                  <h3 className="mt-1 text-2xl font-bold">Electronics from Guangzhou</h3>
+                </div>
+                <span className="rounded-full bg-accent-green/15 px-3 py-1 text-xs font-bold text-accent-green">
+                  Verified
+                </span>
+              </div>
 
-        <div className="overflow-hidden rounded-3xl border border-navy/5 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-navy/5 bg-surface">
-                  <Th>Consignment Code</Th>
-                  <Th>Origin & Route</Th>
-                  <Th>Current Status</Th>
-                  <Th>ETA</Th>
-                  <Th className="text-right">Actions</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-navy/5">
-                <TrackingRow
-                  code="VC-2026-000001"
-                  route="Guangzhou → Tema"
-                  method="Ocean Freight | 40ft Container"
-                  status="Port Clearance"
-                  statusTone="green"
-                  eta="Oct 24, 2026"
-                  etaNote="On Schedule"
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SolutionStep
+                  icon={PackageSearch}
+                  title="Source"
+                  desc="Supplier search, price checks, and purchase guidance."
                 />
-                <TrackingRow
-                  code="VC-2026-000004"
-                  route="Shenzhen → Kotoka"
-                  method="Air Freight | Express"
-                  status="In Transit"
-                  statusTone="brand"
-                  eta="Oct 12, 2026"
-                  etaNote="2 days remaining"
+                <SolutionStep
+                  icon={ClipboardCheck}
+                  title="Inspect"
+                  desc="Warehouse QC with photos, counts, and condition checks."
                 />
-                <TrackingRow
-                  code="VC-2026-000002"
-                  route="Yiwu → Tema"
-                  method="Ocean Freight | LCL"
-                  status="Quality Inspection"
-                  statusTone="orange"
-                  eta="Nov 02, 2026"
-                  etaNote="Awaiting client approval"
+                <SolutionStep
+                  icon={Ship}
+                  title="Ship"
+                  desc="Air, sea, customs support, and Ghana delivery updates."
                 />
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-4 md:grid-cols-3">
+              {[
+                ["China buying support", "Supplier verification before you commit"],
+                ["Consolidation", "Combine purchases from multiple vendors"],
+                ["Live tracking", "Consignment code updates from dispatch to delivery"],
+              ].map(([title, desc]) => (
+                <div key={title} className="rounded-2xl bg-white p-5 shadow-sm">
+                  <Check className="mb-4 h-5 w-5 text-accent-green" />
+                  <h4 className="mb-2 font-bold">{title}</h4>
+                  <p className="text-sm leading-relaxed text-navy/50">{desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -217,83 +223,23 @@ function DashboardPreview() {
   );
 }
 
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-6 py-4 text-xs font-bold tracking-widest text-navy/40 uppercase ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  tone,
+function SolutionStep({
+  icon: Icon,
+  title,
+  desc,
 }: {
-  label: string;
-  value: string;
-  hint: string;
-  tone: "green" | "orange" | "brand";
+  icon: typeof PackageSearch;
+  title: string;
+  desc: string;
 }) {
-  const toneMap = {
-    green: "text-accent-green",
-    orange: "text-accent-orange",
-    brand: "text-brand",
-  } as const;
   return (
-    <div className="rounded-2xl border border-navy/5 bg-surface p-6">
-      <p className="mb-1 text-xs font-bold tracking-widest text-navy/40 uppercase">{label}</p>
-      <h3 className="text-3xl font-bold">{value}</h3>
-      <p className={`mt-4 text-xs font-semibold ${toneMap[tone]}`}>{hint}</p>
+    <div className="rounded-2xl bg-white/10 p-4">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-brand">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h4 className="mb-2 font-bold">{title}</h4>
+      <p className="text-sm leading-relaxed text-white/55">{desc}</p>
     </div>
-  );
-}
-
-function TrackingRow({
-  code,
-  route,
-  method,
-  status,
-  statusTone,
-  eta,
-  etaNote,
-}: {
-  code: string;
-  route: string;
-  method: string;
-  status: string;
-  statusTone: "green" | "brand" | "orange";
-  eta: string;
-  etaNote: string;
-}) {
-  const map = {
-    green: "bg-accent-green/10 text-accent-green",
-    brand: "bg-brand/10 text-brand",
-    orange: "bg-accent-orange/10 text-accent-orange",
-  } as const;
-  return (
-    <tr className="transition-colors hover:bg-surface/50">
-      <td className="px-6 py-6 font-bold text-brand">{code}</td>
-      <td className="px-6 py-6">
-        <div className="text-sm font-semibold">{route}</div>
-        <div className="text-xs text-navy/40">{method}</div>
-      </td>
-      <td className="px-6 py-6">
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${map[statusTone]}`}>
-          {status}
-        </span>
-      </td>
-      <td className="px-6 py-6">
-        <div className="text-sm font-semibold">{eta}</div>
-        <div className="text-xs font-medium text-navy/40">{etaNote}</div>
-      </td>
-      <td className="px-6 py-6 text-right">
-        <button className="text-sm font-semibold text-navy hover:text-brand">Manage</button>
-      </td>
-    </tr>
   );
 }
 
@@ -453,6 +399,17 @@ const tiers = [
     ],
   },
   {
+    name: "Air Normal",
+    price: "$12",
+    unit: "/ kg",
+    features: [
+      "7–10 day delivery",
+      "Reliable air cargo",
+      "Tracking updates",
+      "Great for regular stock",
+    ],
+  },
+  {
     name: "Ocean LCL",
     price: "$450",
     unit: "/ CBM",
@@ -475,7 +432,7 @@ function Pricing() {
           <h2 className="mb-4 text-4xl font-bold tracking-tight">Simple, Transparent Pricing</h2>
           <p className="text-navy/50">No hidden fees. Pay only for what you ship.</p>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {tiers.map((t) => (
             <div
               key={t.name}
@@ -504,13 +461,25 @@ function Pricing() {
               </ul>
               <Link
                 to="/auth"
+                search={{ mode: "signup" }}
                 className={`inline-block w-full rounded-full py-3 text-center text-sm font-semibold transition-colors ${
                   t.featured
                     ? "bg-brand text-white hover:bg-brand/90"
                     : "bg-navy text-white hover:bg-navy/90"
                 }`}
               >
-                Get Started
+                Sign up now
+              </Link>
+              <Link
+                to="/auth"
+                search={{ mode: "signin" }}
+                className={`mt-3 inline-block w-full rounded-full border py-3 text-center text-sm font-semibold transition-colors ${
+                  t.featured
+                    ? "border-white/15 text-white hover:bg-white/10"
+                    : "border-navy/10 text-navy hover:bg-white"
+                }`}
+              >
+                Sign in
               </Link>
             </div>
           ))}
@@ -569,20 +538,48 @@ function Testimonials() {
 
 const faqs = [
   {
-    q: "How long does shipping from China to Ghana take?",
-    a: "Air freight typically takes 3–5 business days. Ocean LCL takes 30–45 days depending on port schedules and consolidation.",
+    q: "Where is your office located in Ghana?",
+    a: "You can locate our Ghana office at East Legon.",
+  },
+  {
+    q: "Where is your office located in China?",
+    a: "You can locate our China office at 2F12, 2nd Flooe, Jiuzhilong Trade City No. 18 Guangyuan West Road Kuagquan Street, Yuexiu District Guangzhou City, Guangdong Province, China 广东省广州市越秀区广州市矿泉街道广园西路18号九之龙商贸城2楼2F12.",
+  },
+  {
+    q: "Where is your warehouse located in China?",
+    a: "North Area of Shanghua Industrial ZoneLecong Town, Shunde District Foshan City, Guangdong Province, China 佛山市顺德区乐从镇上华工业北区1号 ",
   },
   {
     q: "How do I get my consignment code?",
     a: "Once you create a shipment in your VoltCargo dashboard, a unique consignment code (e.g. VC-2026-000001) is generated automatically.",
   },
   {
-    q: "Do you provide cargo insurance?",
-    a: "Yes. VoltCargo offers cargo insurance for fragile or high-value shipments. Any goods supplied through VoltCargo are eligible for our insurance program.",
+    q: "Do you provide insurance.?",
+    a: "Yes. All goods shipped are insured.",
   },
   {
     q: "How are payments processed?",
     a: "All payments are processed securely via Paystack — card, bank transfer, and mobile money. Goods are released for delivery only after full payment is confirmed.",
+  },
+  {
+    q: "Do you do door to door delivery?",
+    a: "Yes. we are able to arrange for delivery for you when your things are in Ghana.",
+  },
+  {
+    q: "Do you do sourcing?",
+    a: "Yes. We are able to support you source goods and get in touch with reliable suppliers from China. Electronics, Building Materials, machines, Cars. Kindly click on the sourcing tap to view our sourcing page",
+  },
+  {
+    q: "Do you do consolidation?",
+    a: "We offer consolidation and also repacking of goods at our China warehouse.",
+  },
+  {
+    q: "What is your CBM?",
+    a: "$250 per cbm.",
+  },
+  {
+    q: "How long does goods take to get to Ghana?",
+    a: "Goods take 45 days to get to you in Ghana. ",
   },
 ];
 
@@ -624,8 +621,18 @@ function Contact() {
           <p className="text-navy/50">Our logistics team is available around the clock.</p>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          <ContactCard icon={MessageCircle} label="WhatsApp" value="+233 24 000 0000" />
-          <ContactCard icon={Mail} label="Email" value="voltcargo@gmail.com" />
+          <ContactCard
+            icon={MessageCircle}
+            label="WhatsApp"
+            value="+233 24 000 0000"
+            href="https://wa.me/233240000000"
+          />
+          <ContactCard
+            icon={Mail}
+            label="Email"
+            value="voltcargo@gmail.com"
+            href="mailto:voltcargo@gmail.com"
+          />
           <ContactCard icon={Phone} label="Phone" value="+233 30 200 0000" />
         </div>
         <div className="mt-10 flex items-center justify-center gap-2 text-sm text-navy/50">
@@ -640,13 +647,15 @@ function ContactCard({
   icon: Icon,
   label,
   value,
+  href,
 }: {
   icon: typeof Mail;
   label: string;
   value: string;
+  href?: string;
 }) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-navy/5 bg-white p-6">
+  const content = (
+    <>
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
         <Icon className="h-6 w-6" />
       </div>
@@ -654,6 +663,25 @@ function ContactCard({
         <p className="text-xs font-bold tracking-widest text-navy/40 uppercase">{label}</p>
         <p className="font-semibold">{value}</p>
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noreferrer" : undefined}
+        className="flex items-center gap-4 rounded-2xl border border-navy/5 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-navy/5 bg-white p-6">
+      {content}
     </div>
   );
 }

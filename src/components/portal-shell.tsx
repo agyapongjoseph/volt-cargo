@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -17,7 +17,14 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getSessionProfile, type AppRole } from "@/lib/data";
+import {
+  getClientDashboardData,
+  getSessionProfile,
+  STATUS_LABEL,
+  type AppRole,
+  type Invoice,
+  type Shipment,
+} from "@/lib/data";
 import { supabase } from "@/lib/supabase/client";
 
 export type PortalRole = "client" | "admin" | "warehouse" | "qc" | "delivery";
@@ -92,9 +99,16 @@ export function PortalShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: profile } = useQuery({ queryKey: ["session-profile"], queryFn: getSessionProfile });
+  const { data: notificationData } = useQuery({
+    queryKey: ["portal-notifications", role],
+    queryFn: getClientDashboardData,
+    enabled: role === "client",
+  });
   const nav = NAV[role];
   const roles = profile?.roles ?? [];
   const portals = ROLE_SWITCH.filter((item) =>
@@ -108,6 +122,23 @@ export function PortalShell({
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  const notifications = buildNotifications(
+    notificationData?.shipments ?? [],
+    notificationData?.invoices ?? [],
+  );
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!notificationsRef.current?.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [notificationsOpen]);
 
   const handleSignOut = async () => {
     await supabase?.auth.signOut();
@@ -124,7 +155,11 @@ export function PortalShell({
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-navy/5 px-5">
-          <img src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He" alt="Logo" className="h-8 w-25" />
+          <img
+            src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He"
+            alt="Logo"
+            className="h-8 w-25"
+          />
         </div>
 
         <div className="p-4">
@@ -216,19 +251,49 @@ export function PortalShell({
             <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
             {subtitle && <p className="text-xs text-navy/50">{subtitle}</p>}
           </div>
-          <button
-            className="rounded-full p-2 text-navy/60 hover:bg-surface"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
-          <Link
+          <div ref={notificationsRef} className="relative">
+            <button
+              onClick={() => setNotificationsOpen((value) => !value)}
+              className="relative rounded-full p-2 text-navy/60 hover:bg-surface"
+              aria-label="Notifications"
+            >
+              <Bell className="h-4 w-4" />
+              {notifications.length > 0 && (
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand" />
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-xl">
+                <div className="border-b border-navy/5 p-4">
+                  <p className="text-sm font-bold text-navy">Notifications</p>
+                  <p className="text-xs text-navy/45">Shipment and invoice updates</p>
+                </div>
+                <div className="max-h-80 overflow-y-auto p-2">
+                  {notifications.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={item.to}
+                      className="block rounded-xl p-3 hover:bg-surface"
+                      onClick={() => setNotificationsOpen(false)}
+                    >
+                      <p className="text-sm font-semibold text-navy">{item.title}</p>
+                      <p className="mt-1 text-xs text-navy/50">{item.body}</p>
+                    </Link>
+                  ))}
+                  {notifications.length === 0 && (
+                    <p className="p-6 text-center text-sm text-navy/50">No new notifications.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* <Link
             to="/"
             className="rounded-full p-2 text-navy/60 hover:bg-surface"
             aria-label="Settings"
           >
             <Settings className="h-4 w-4" />
-          </Link>
+          </Link> */}
           {actions}
         </header>
         <main className="flex-1 p-6">{children}</main>
@@ -264,4 +329,25 @@ export function StatCard({
       {hint && <p className="mt-1 text-xs text-navy/50">{hint}</p>}
     </div>
   );
+}
+
+function buildNotifications(shipments: Shipment[], invoices: Invoice[]) {
+  const invoiceItems = invoices
+    .filter((invoice) => !invoice.paid)
+    .slice(0, 3)
+    .map((invoice) => ({
+      id: `invoice-${invoice.id}`,
+      title: "Invoice payment due",
+      body: `${invoice.id} for ${invoice.code || "your shipment"} is $${invoice.amount.toLocaleString()}.`,
+      to: "/dashboard#invoices",
+    }));
+
+  const shipmentItems = shipments.slice(0, 4).map((shipment) => ({
+    id: `shipment-${shipment.code}`,
+    title: STATUS_LABEL[shipment.status],
+    body: `${shipment.code} is currently ${STATUS_LABEL[shipment.status].toLowerCase()}.`,
+    to: `/shipments/${shipment.code}`,
+  }));
+
+  return [...invoiceItems, ...shipmentItems].slice(0, 6);
 }

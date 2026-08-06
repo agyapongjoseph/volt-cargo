@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PortalShell, StatCard } from "@/components/portal-shell";
 import {
   getClientDashboardData,
@@ -9,9 +9,99 @@ import {
   STATUS_LABEL,
   statusColor,
   type Client,
+  type Shipment,
 } from "@/lib/data";
-import { Plus, Search, Download, Upload, X } from "lucide-react";
+import { Plus, Search, Download, X, CheckCircle2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const chinaWarehouseAddress = [
+  "North Area of Shanghua Industrial Zone",
+  "Lecong Town, Shunde District",
+  "Foshan City, Guangdong Province, China",
+  "佛山市顺德区乐从镇上华工业北区1号",
+];
+
+const shippingServices = [
+  {
+    id: "air-normal",
+    family: "Air Freight",
+    name: "Air Normal",
+    mode: "Air" as const,
+    timeline: "7-14 days after dispatch",
+    estimate: "$15/kg",
+    rate: 15,
+    unit: "kg",
+    note: "Best balance for regular stock that still needs air speed.",
+  },
+  {
+    id: "air-express",
+    family: "Air Freight",
+    name: "Air Express",
+    mode: "Air" as const,
+    timeline: "2-5 days after dispatch",
+    estimate: "$20/kg",
+    rate: 20,
+    unit: "kg",
+    note: "Fastest option for urgent, lightweight, or high-value goods.",
+  },
+  {
+    id: "air-battery",
+    family: "Air Freight",
+    name: "Battery ",
+    mode: "Air" as const,
+    timeline: "Special handling by air",
+    estimate: "$25/kg",
+    rate: 25,
+    unit: "kg",
+    note: "For batteries and regulated air cargo requiring special handling.",
+  },
+  {
+    id: "air-phone",
+    family: "Air Freight",
+    name: "Phones",
+    mode: "Air" as const,
+    timeline: "Special handling by air",
+    estimate: "$25/kg",
+    rate: 25,
+    unit: "kg",
+    note: "For mobile phones and similar high-value electronics.",
+  },
+  {
+    id: "ocean-lcl",
+    family: "Ocean Freight",
+    name: "LCL",
+    mode: "Sea" as const,
+    timeline: "30-45 days after sailing",
+    estimate: "$250/CBM",
+    rate: 250,
+    unit: "cbm",
+    note: "Shared container service for smaller sea shipments.",
+  },
+  {
+    id: "ocean-fcl",
+    family: "Ocean Freight",
+    name: "FCL",
+    mode: "Sea" as const,
+    timeline: "30-45 days after sailing",
+    estimate: "$5,900 flat estimate",
+    rate: 5900,
+    unit: "flat",
+    note: "Dedicated full-container movement for larger cargo.",
+  },
+];
+
+const shipmentPaths = [
+  {
+    id: "own-supplier",
+    title: "I already have a supplier",
+    desc: "Create a consignment code and give it with our China warehouse address to your supplier or sourcer.",
+  },
+  {
+    id: "voltcargo-sourcing",
+    title: "I want VoltCargo to source and ship",
+    desc: "VoltCargo helps buy the goods, receives the consignment internally, and handles shipping for you.",
+  },
+] as const;
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -26,6 +116,8 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardPage() {
   const [showNew, setShowNew] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const { data, isLoading, error } = useQuery({
     queryKey: ["client-dashboard"],
@@ -45,7 +137,20 @@ function DashboardPage() {
   const active = clientShipments.filter((s) => s.status !== "delivered").length;
   const delivered = clientShipments.filter((s) => s.status === "delivered").length;
   const outstanding = clientInvoices.filter((i) => !i.paid).reduce((sum, i) => sum + i.amount, 0);
-  const spend = clientInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const paidSpend = clientInvoices.filter((i) => i.paid).reduce((sum, i) => sum + i.amount, 0);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!exportRef.current?.contains(event.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [exportOpen]);
 
   if (isLoading) {
     return (
@@ -133,9 +238,9 @@ function DashboardPage() {
           accent="orange"
         />
         <StatCard
-          label="Total spend YTD"
-          value={`$${spend.toLocaleString()}`}
-          hint="Across your shipments"
+          label="Paid spend YTD"
+          value={`$${paidSpend.toLocaleString()}`}
+          hint="Paid invoices only"
           accent="brand"
         />
       </div>
@@ -147,7 +252,7 @@ function DashboardPage() {
             <p className="text-xs text-navy/50">Track and manage every consignment</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
+            <div ref={exportRef} className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy/40" />
               <input
                 value={query}
@@ -156,9 +261,41 @@ function DashboardPage() {
                 className="w-64 rounded-full border border-navy/10 bg-surface py-2 pl-9 pr-3 text-sm focus:border-brand focus:outline-none"
               />
             </div>
-            <button className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-3 py-2 text-xs font-semibold text-navy/70 hover:bg-surface">
-              <Download className="h-3.5 w-3.5" /> Export
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-4 py-2 text-xs font-semibold text-navy/70 hover:bg-surface"
+              >
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 z-10 mt-2 w-36 overflow-hidden rounded-xl border border-navy/10 bg-white py-1 shadow-xl">
+                  {(["pdf", "excel", "csv"] as const).map((format) => (
+                    <button
+                      key={format}
+                      onClick={() => {
+                        exportShipments(filtered, format);
+                        setExportOpen(false);
+                      }}
+                      className="block w-full px-4 py-2 text-left text-xs font-semibold text-navy/70 hover:bg-surface"
+                    >
+                      {format.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* <div className="flex rounded-full border border-navy/10 bg-white p-1">
+              {(["csv", "excel", "pdf"] as const).map((format) => (
+                <button
+                  key={format}
+                  onClick={() => exportShipments(filtered, format)}
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-navy/70 hover:bg-surface"
+                >
+                  <Download className="h-3.5 w-3.5" /> {format.toUpperCase()}
+                </button>
+              ))}
+            </div> */}
           </div>
         </div>
 
@@ -186,7 +323,7 @@ function DashboardPage() {
                     >
                       {s.code}
                     </Link>
-                    <p className="text-xs text-navy/50">{s.description}</p>
+                    <ShipmentDescription value={s.description} />
                   </td>
                   <td className="px-5 py-3 text-xs text-navy/70">
                     {s.origin} → {s.destination}
@@ -196,8 +333,10 @@ function DashboardPage() {
                       {s.mode}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-navy/70">{s.weightKg} kg</td>
-                  <td className="px-5 py-3 text-navy/70">{s.eta}</td>
+                  <td className="px-5 py-3 text-navy/70">
+                    {s.mode === "Air" ? `${s.weightKg || 0} kg` : `${s.cbm || 0} CBM`}
+                  </td>
+                  <td className="px-5 py-3 text-navy/70">{s.eta || "Pending"}</td>
                   <td className="px-5 py-3">
                     <span
                       className={cn(
@@ -215,9 +354,11 @@ function DashboardPage() {
                         s.paid ? "text-accent-green" : "text-accent-orange",
                       )}
                     >
-                      ${s.invoiceTotal}
+                      {s.invoiceTotal ? `$${s.invoiceTotal.toLocaleString()}` : "Pending"}
                     </span>
-                    <p className="text-xs text-navy/50">{s.paid ? "Paid" : "Due"}</p>
+                    <p className="text-xs text-navy/50">
+                      {s.invoiceTotal ? (s.paid ? "Paid" : "Due in Ghana") : "Issued on arrival"}
+                    </p>
                   </td>
                 </tr>
               ))}
@@ -290,29 +431,183 @@ function PanelMessage({ children }: { children: ReactNode }) {
   );
 }
 
+function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf") {
+  const rows = shipments.map((shipment) => ({
+    Code: shipment.code,
+    Description: shipment.description,
+    Route: `${shipment.origin} -> ${shipment.destination}`,
+    Mode: shipment.mode,
+    Pieces: shipment.pieces,
+    Weight: shipment.mode === "Air" ? `${shipment.weightKg || 0} kg` : `${shipment.cbm || 0} CBM`,
+    ETA: shipment.eta || "Pending",
+    Status: STATUS_LABEL[shipment.status],
+    Invoice: shipment.invoiceTotal ? `$${shipment.invoiceTotal.toLocaleString()}` : "Pending",
+    Payment: shipment.invoiceTotal
+      ? shipment.paid
+        ? "Paid"
+        : "Due in Ghana"
+      : "Issued on arrival",
+  }));
+
+  if (format === "csv") {
+    downloadFile("voltcargo-shipments.csv", toCsv(rows), "text/csv;charset=utf-8");
+    return;
+  }
+
+  if (format === "excel") {
+    downloadFile(
+      "voltcargo-shipments.xls",
+      toExcelTable(rows),
+      "application/vnd.ms-excel;charset=utf-8",
+    );
+    return;
+  }
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(toPrintablePdf(rows));
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function parseShipmentDescription(value: string) {
+  const match = value.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
+  if (!match) return { path: "", service: "", item: value };
+  return { path: match[1], service: match[2], item: match[3] };
+}
+
+function ShipmentDescription({ value }: { value: string }) {
+  const parsed = parseShipmentDescription(value);
+  if (!parsed.path && !parsed.service) {
+    return <p className="text-xs text-navy/50">{value}</p>;
+  }
+
+  return (
+    <div className="mt-1 space-y-1">
+      <div className="flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+          {parsed.path}
+        </span>
+        <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[11px] font-semibold text-navy/60">
+          {parsed.service}
+        </span>
+      </div>
+      <p className="text-xs text-navy/55">{parsed.item}</p>
+    </div>
+  );
+}
+
+function toCsv(rows: Record<string, string | number>[]) {
+  if (!rows.length) return "No shipments\n";
+  const headers = Object.keys(rows[0]);
+  return [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers.map((header) => `"${String(row[header] ?? "").replace(/"/g, '""')}"`).join(","),
+    ),
+  ].join("\n");
+}
+
+function toExcelTable(rows: Record<string, string | number>[]) {
+  if (!rows.length) return "<table><tr><td>No shipments</td></tr></table>";
+  const headers = Object.keys(rows[0]);
+  return `
+    <table>
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${rows
+          .map(
+            (row) =>
+              `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}</tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function toPrintablePdf(rows: Record<string, string | number>[]) {
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <title>VoltCargo Shipments</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #0f172a; padding: 32px; }
+          h1 { margin-bottom: 4px; }
+          p { color: rgba(15, 23, 42, 0.6); }
+          table { border-collapse: collapse; width: 100%; margin-top: 24px; font-size: 12px; }
+          th, td { border: 1px solid rgba(15, 23, 42, 0.12); padding: 8px; text-align: left; }
+          th { background: #f8fafc; }
+        </style>
+      </head>
+      <body>
+        <h1>VoltCargo Shipments</h1>
+        <p>Generated ${new Date().toLocaleString()}</p>
+        ${toExcelTable(rows)}
+      </body>
+    </html>
+  `;
+}
+
+function downloadFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value: string | number | undefined) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function calculateEstimate(
+  service: (typeof shippingServices)[number],
+  weightKg: string,
+  cbm: string,
+) {
+  if (service.unit === "flat") return service.rate;
+  const quantity = service.unit === "kg" ? Number(weightKg || 0) : Number(cbm || 0);
+  return Math.max(0, Math.round(quantity * service.rate * 100) / 100);
+}
+
 function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
-  const [mode, setMode] = useState<"Air" | "Sea">("Air");
+  const [path, setPath] = useState<(typeof shipmentPaths)[number]["id"]>("own-supplier");
+  const [serviceId, setServiceId] = useState(shippingServices[0].id);
   const [origin, setOrigin] = useState("Guangzhou, CN");
   const [destination, setDestination] = useState("Accra, GH");
   const [description, setDescription] = useState("");
   const [pieces, setPieces] = useState("1");
   const [weightKg, setWeightKg] = useState("");
   const [cbm, setCbm] = useState("");
-  const [declaredValue, setDeclaredValue] = useState("");
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const selectedService =
+    shippingServices.find((service) => service.id === serviceId) ?? shippingServices[0];
+  const selectedPath = shipmentPaths.find((item) => item.id === path) ?? shipmentPaths[0];
+  const estimatedPrice = calculateEstimate(selectedService, weightKg, cbm);
   const createShipment = useMutation({
     mutationFn: () =>
       createShipmentForCurrentClient({
         origin,
         destination,
-        mode,
-        description,
+        mode: selectedService.mode,
+        description: `[${selectedPath.title}] ${selectedService.family} - ${selectedService.name}: ${description}`,
         pieces: Number(pieces || 0),
         weightKg: Number(weightKg || 0),
         cbm: Number(cbm || 0),
-        declaredValue: Number(declaredValue || 0),
+        declaredValue: estimatedPrice,
       }),
     onSuccess: async (shipment) => {
       setCreatedCode(shipment.code);
@@ -329,9 +624,9 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-navy/5 p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-3 sm:p-4">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="shrink-0 flex items-center justify-between border-b border-navy/5 p-4">
           <div>
             <h3 className="text-lg font-semibold">Create New Shipment</h3>
             <p className="text-xs text-navy/50">Step {step} of 3</p>
@@ -340,36 +635,65 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-navy/70">
-                  Shipping Mode
+                <label className="mb-2 block text-xs font-semibold text-navy/70">
+                  What do you need VoltCargo to do?
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: "Air Freight", value: "Air" as const },
-                    { label: "Ocean Freight", value: "Sea" as const },
-                  ].map((m) => (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {shipmentPaths.map((item) => (
                     <button
-                      key={m.value}
+                      key={item.id}
                       type="button"
-                      onClick={() => setMode(m.value)}
+                      onClick={() => setPath(item.id)}
                       className={cn(
-                        "rounded-xl border p-4 text-left hover:border-brand",
-                        mode === m.value ? "border-brand bg-brand/5" : "border-navy/10 bg-surface",
+                        "rounded-xl border p-3 text-left transition-colors hover:border-brand",
+                        path === item.id ? "border-brand bg-brand/5" : "border-navy/10 bg-surface",
                       )}
                     >
-                      <p className="font-semibold text-navy">{m.label}</p>
-                      <p className="text-xs text-navy/50">
-                        {m.value === "Air" ? "5–7 days • from $8/kg" : "35–45 days • from $180/CBM"}
-                      </p>
+                      <p className="font-semibold text-navy">{item.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-navy/50">{item.desc}</p>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-navy/70">
+                  Shipping package
+                </label>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {shippingServices.map((service) => (
+                    <button
+                      key={service.id}
+                      type="button"
+                      onClick={() => setServiceId(service.id)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left hover:border-brand",
+                        serviceId === service.id
+                          ? "border-brand bg-brand/5"
+                          : "border-navy/10 bg-surface",
+                      )}
+                    >
+                      <p className="text-xs font-bold tracking-widest text-brand uppercase">
+                        {service.family}
+                      </p>
+                      <p className="mt-1 font-semibold text-navy">{service.name}</p>
+                      <p className="mt-1 text-xs text-navy/50">{service.timeline}</p>
+                      <p className="mt-2 text-sm font-bold text-navy">{service.estimate}</p>
+                      <p className="mt-1 text-[11px] text-navy/45">{service.note}</p>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 rounded-xl bg-accent-orange/10 p-3 text-xs leading-relaxed text-navy/65">
+                  Estimates are guidance only. Final charges can change after goods arrive in Ghana
+                  because actual weight, volume, customs, duties, and local handling are confirmed
+                  at arrival. Payment is made when goods arrive in Ghana before release/delivery.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
                 <Field
                   label="Origin"
                   value={origin}
@@ -393,7 +717,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
           )}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-3 md:grid-cols-2">
                 <Field
                   label="Pieces"
                   value={pieces}
@@ -401,32 +725,37 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                   type="number"
                   placeholder="3"
                 />
-                <Field
-                  label="Weight (kg)"
-                  value={weightKg}
-                  onChange={setWeightKg}
-                  type="number"
-                  placeholder="42.5"
-                />
-                <Field label="CBM" value={cbm} onChange={setCbm} type="number" placeholder="0.18" />
+                {selectedService.mode === "Air" ? (
+                  <Field
+                    label="Weight (kg)"
+                    value={weightKg}
+                    onChange={setWeightKg}
+                    type="number"
+                    placeholder="42.5"
+                  />
+                ) : (
+                  <Field
+                    label="CBM"
+                    value={cbm}
+                    onChange={setCbm}
+                    type="number"
+                    placeholder="0.18"
+                  />
+                )}
               </div>
-              <Field
-                label="Declared value (USD)"
-                value={declaredValue}
-                onChange={setDeclaredValue}
-                type="number"
-                placeholder="2400"
-              />
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-navy/70">
-                  Upload invoice / photos
-                </label>
-                <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-navy/10 bg-surface p-8">
-                  <div className="text-center">
-                    <Upload className="mx-auto h-8 w-8 text-navy/30" />
-                    <p className="mt-2 text-sm text-navy/60">Drop files or click to upload</p>
-                  </div>
-                </div>
+              <div className="rounded-xl border border-brand/10 bg-brand/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-brand">
+                  Estimated value
+                </p>
+                <p className="mt-2 text-3xl font-bold text-navy">
+                  ${estimatedPrice.toLocaleString()}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-navy/55">
+                  Calculated from {selectedService.estimate}. Air packages use KG, Ocean LCL uses
+                  CBM, and Ocean FCL uses a flat container estimate. Final invoice may change after
+                  Ghana arrival when actual measurements, customs, duties, and local handling are
+                  confirmed.
+                </p>
               </div>
             </div>
           )}
@@ -445,16 +774,41 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                   {createdCode ?? "Generated after submit"}
                 </p>
                 <p className="mt-1 text-xs text-navy/50">
-                  The database trigger creates the permanent code when the shipment is saved.
+                  {path === "own-supplier"
+                    ? "Give this code to your supplier or sourcer when they deliver to our China warehouse."
+                    : "VoltCargo will use this code internally while sourcing, receiving, and shipping your goods."}
                 </p>
               </div>
               <div className="rounded-xl border border-navy/5 bg-surface p-4">
-                <p className="text-xs font-semibold uppercase text-navy/50">Estimated invoice</p>
-                <p className="mt-1 text-2xl font-bold">$380.00</p>
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-navy/50">
+                  <MapPin className="h-3.5 w-3.5" /> VoltCargo China warehouse address -Copy Address
+                </div>
+                <div className="space-y-1 text-sm font-semibold text-navy">
+                  {chinaWarehouseAddress.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-navy/5 bg-surface p-4">
+                <p className="text-xs font-semibold uppercase text-navy/50">Selected package</p>
+                <p className="mt-1 text-lg font-bold">
+                  {selectedService.family} - {selectedService.name}
+                </p>
                 <p className="mt-1 text-xs text-navy/50">
-                  Finalized after arrival & QC at China hub.
+                  {selectedService.estimate}. Final shipping invoice is confirmed when goods arrive
+                  in Ghana and must be paid before release/delivery.
                 </p>
               </div>
+              {createdCode && (
+                <div className="rounded-xl border border-accent-green/10 bg-accent-green/10 p-4 text-sm text-navy/70">
+                  <div className="mb-2 flex items-center gap-2 font-semibold text-accent-green">
+                    <CheckCircle2 className="h-4 w-4" /> Shipment created successfully
+                  </div>
+                  {path === "own-supplier"
+                    ? "Send the consignment code and warehouse address to your supplier. They must present both when delivering your goods."
+                    : "Our sourcing team can now handle purchase, receiving, and shipping under this consignment code."}
+                </div>
+              )}
               {createShipment.error && (
                 <p className="rounded-xl bg-accent-red/10 p-3 text-xs text-accent-red">
                   {createShipment.error instanceof Error
@@ -465,7 +819,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-navy/5 p-5">
+        <div className="shrink-0 flex items-center justify-between border-t border-navy/5 p-4">
           <button
             onClick={() => (step > 1 ? setStep(step - 1) : onClose())}
             className="rounded-full px-4 py-2 text-sm font-semibold text-navy/60 hover:bg-surface"

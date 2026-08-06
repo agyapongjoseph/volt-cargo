@@ -9,9 +9,25 @@ import {
   statusColor,
   clientSpend,
   upsertInvoiceForShipment,
+  type Invoice,
+  type Shipment,
 } from "@/lib/data";
 import { Search, Filter, MoreVertical, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -47,6 +63,32 @@ function AdminContent() {
   const revenue = invoices.reduce((s, i) => s + i.amount, 0);
   const outstanding = invoices.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
   const inFlight = shipments.filter((s) => !["delivered"].includes(s.status)).length;
+  const paidRevenue = invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
+  const airShipments = shipments.filter((s) => s.mode === "Air").length;
+  const seaShipments = shipments.filter((s) => s.mode === "Sea").length;
+  const delivered = shipments.filter((s) => s.status === "delivered").length;
+  const deliveryRate = shipments.length ? Math.round((delivered / shipments.length) * 100) : 0;
+  const revenueTrend = buildRevenueTrend(invoices);
+  const statusData = buildStatusData(shipments);
+  const modeData = [
+    { name: "Air", value: airShipments, color: "#f97316" },
+    { name: "Sea", value: seaShipments, color: "#0f172a" },
+  ].filter((item) => item.value > 0);
+  const queueData = [
+    {
+      name: "China Hub",
+      value: shipments.filter((s) => ["received_cn", "qc"].includes(s.status)).length,
+    },
+    { name: "In Transit", value: shipments.filter((s) => s.status === "in_transit").length },
+    {
+      name: "Ghana Port",
+      value: shipments.filter((s) => ["port_gh", "cleared"].includes(s.status)).length,
+    },
+    {
+      name: "Delivery",
+      value: shipments.filter((s) => ["out_for_delivery", "delivered"].includes(s.status)).length,
+    },
+  ];
 
   useEffect(() => {
     const syncHash = () => {
@@ -85,7 +127,7 @@ function AdminContent() {
 
   return (
     <PortalShell role="admin" title="Admin Console" subtitle="Operations control tower">
-      <div className="mb-6 inline-flex rounded-full border border-navy/10 bg-white p-1 text-sm">
+      {/* <div className="mb-6 inline-flex rounded-full border border-navy/10 bg-white p-1 text-sm">
         {(["overview", "shipments", "clients", "invoices", "users"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -98,47 +140,134 @@ function AdminContent() {
             {t}
           </button>
         ))}
-      </div>
+      </div> */}
 
       {tab === "overview" && (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Revenue (MTD)" value={`$${revenue.toLocaleString()}`} accent="brand" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Revenue" value={`$${revenue.toLocaleString()}`} accent="brand" />
+            <StatCard label="Collected" value={`$${paidRevenue.toLocaleString()}`} accent="green" />
             <StatCard
               label="Outstanding"
               value={`$${outstanding.toLocaleString()}`}
               accent="orange"
             />
             <StatCard label="Active shipments" value={inFlight} accent="green" />
-            <StatCard label="Clients" value={clients.length} accent="brand" />
+            <StatCard label="Delivery rate" value={`${deliveryRate}%`} accent="brand" />
           </div>
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm lg:col-span-2">
-              <h3 className="mb-4 text-base font-semibold">Shipments by status</h3>
-              <div className="space-y-3">
-                {Object.entries(
-                  shipments.reduce<Record<string, number>>((acc, s) => {
-                    acc[s.status] = (acc[s.status] ?? 0) + 1;
-                    return acc;
-                  }, {}),
-                ).map(([s, count]) => (
-                  <div key={s} className="flex items-center gap-3">
-                    <div className="w-40 text-xs text-navy/60">
-                      {STATUS_LABEL[s as keyof typeof STATUS_LABEL]}
-                    </div>
-                    <div className="flex-1">
-                      <div className="h-2 overflow-hidden rounded-full bg-surface">
-                        <div
-                          className="h-full bg-brand"
-                          style={{ width: `${(count / shipments.length) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-8 text-right text-xs font-semibold">{count}</div>
-                  </div>
-                ))}
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-3">
+            <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm xl:col-span-2">
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold">Revenue performance</h3>
+                  <p className="text-xs text-navy/45">Invoice volume and billing trend by month</p>
+                </div>
+                <div className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+                  {invoices.length} invoices
+                </div>
+              </div>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueTrend} margin={{ left: 14, right: 8, top: 8 }}>
+                    <defs>
+                      <linearGradient id="revenueFill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#0f172a" strokeOpacity={0.06} vertical={false} />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tickMargin={10} />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(value) => `$${value}`}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#f97316"
+                      strokeWidth={3}
+                      fill="url(#revenueFill)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
+
+            <div className="rounded-2xl border border-navy/5 bg-navy p-6 text-white shadow-sm">
+              <h3 className="text-base font-semibold">Freight mix</h3>
+              <p className="mb-6 text-xs text-white/45">Mode split across all shipments</p>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={modeData}
+                      dataKey="value"
+                      innerRadius={58}
+                      outerRadius={86}
+                      paddingAngle={5}
+                    >
+                      {modeData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FreightMetric label="Air" value={airShipments} color="bg-accent-orange" />
+                <FreightMetric label="Sea" value={seaShipments} color="bg-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-3">
+            <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm xl:col-span-2">
+              <h3 className="text-base font-semibold">Operational pipeline</h3>
+              <p className="mb-6 text-xs text-navy/45">
+                Where shipments currently sit in the corridor
+              </p>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={queueData} margin={{ left: -20, right: 8, top: 8 }}>
+                    <CartesianGrid stroke="#0f172a" strokeOpacity={0.06} vertical={false} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tickMargin={10} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar dataKey="value" radius={[12, 12, 0, 0]} fill="#f97316" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
+              <h3 className="text-base font-semibold">Shipments by status</h3>
+              <p className="mb-5 text-xs text-navy/45">Live count by milestone</p>
+              <div className="space-y-4">
+                {statusData.map((item) => (
+                  <div key={item.status}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <span className="font-medium text-navy/60">{item.label}</span>
+                      <span className="font-bold text-navy">{item.count}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-surface">
+                      <div className="h-full bg-brand" style={{ width: `${item.percent}%` }} />
+                    </div>
+                  </div>
+                ))}
+                {statusData.length === 0 && (
+                  <p className="rounded-2xl bg-surface p-6 text-center text-sm text-navy/50">
+                    No shipment data yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
             <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
               <h3 className="mb-4 text-base font-semibold">Recent activity</h3>
               <ul className="space-y-3 text-sm">
@@ -163,6 +292,21 @@ function AdminContent() {
                 ))}
               </ul>
             </div>
+            <InsightCard
+              label="Client base"
+              value={clients.length}
+              desc="Registered importers with a permanent VoltCargo client ID."
+            />
+            <InsightCard
+              label="Average invoice"
+              value={`$${(invoices.length ? revenue / invoices.length : 0).toLocaleString(
+                undefined,
+                {
+                  maximumFractionDigits: 0,
+                },
+              )}`}
+              desc="Blended invoice value across all billed consignments."
+            />
           </div>
         </>
       )}
@@ -392,6 +536,96 @@ function PanelMessage({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-2xl border border-navy/5 bg-white p-8 text-sm text-navy/60 shadow-sm">
       {children}
+    </div>
+  );
+}
+
+function buildRevenueTrend(invoices: Invoice[]) {
+  const formatter = new Intl.DateTimeFormat("en", { month: "short" });
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return { key, month: formatter.format(date), revenue: 0 };
+  });
+
+  invoices.forEach((invoice) => {
+    if (!invoice.issued) return;
+    const date = new Date(invoice.issued);
+    if (Number.isNaN(date.getTime())) return;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const month = months.find((item) => item.key === key);
+    if (month) month.revenue += invoice.amount;
+  });
+
+  return months;
+}
+
+function buildStatusData(shipments: Shipment[]) {
+  const counts = shipments.reduce<Record<string, number>>((acc, shipment) => {
+    acc[shipment.status] = (acc[shipment.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts).map(([status, count]) => ({
+    status,
+    count,
+    label: STATUS_LABEL[status as keyof typeof STATUS_LABEL],
+    percent: shipments.length ? Math.round((count / shipments.length) * 100) : 0,
+  }));
+}
+
+function FreightMetric({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <span className={cn("h-2.5 w-2.5 rounded-full", color)} />
+        <span className="text-xs font-semibold text-white/55">{label}</span>
+      </div>
+      <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function InsightCard({ label, value, desc }: { label: string; value: ReactNode; desc: string }) {
+  return (
+    <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
+      <p className="text-xs font-bold tracking-widest text-navy/40 uppercase">{label}</p>
+      <h3 className="mt-3 text-3xl font-bold text-navy">{value}</h3>
+      <p className="mt-4 text-sm leading-relaxed text-navy/50">{desc}</p>
+    </div>
+  );
+}
+
+type TooltipPayload = {
+  color?: string;
+  name?: string;
+  value?: number | string;
+};
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-xl border border-navy/10 bg-white px-3 py-2 text-xs shadow-xl">
+      {label && <p className="mb-1 font-semibold text-navy">{label}</p>}
+      {payload.map((item) => (
+        <div key={`${item.name}-${item.value}`} className="flex items-center gap-2 text-navy/65">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+          <span>{item.name}: </span>
+          <span className="font-semibold text-navy">
+            {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

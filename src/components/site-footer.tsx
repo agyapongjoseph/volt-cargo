@@ -14,8 +14,23 @@ export function SiteFooter() {
               with enterprise-grade technology and reliability.
             </p>
             <div className="space-y-2 text-sm text-white/70">
-              <p>WhatsApp: +233 24 000 0000</p>
-              <p>Email: voltscargo@gmail.com</p>
+              <p>
+                WhatsApp:{" "}
+                <a
+                  className="transition-colors hover:text-white"
+                  href="https://wa.me/233240000000"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  +233 24 000 0000
+                </a>
+              </p>
+              <p>
+                Email:{" "}
+                <a className="transition-colors hover:text-white" href="mailto:voltcargo@gmail.com">
+                  voltcargo@gmail.com
+                </a>
+              </p>
               <p>Head Office: Accra, Ghana</p>
             </div>
           </div>
