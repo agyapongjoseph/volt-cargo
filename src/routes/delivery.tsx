@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { PortalShell, StatCard } from "@/components/portal-shell";
 import { RoleGuard } from "@/components/role-guard";
 import {
@@ -16,6 +17,7 @@ import {
   PackageCheck,
   Phone,
   Route as RouteIcon,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,8 @@ function DeliveryPage() {
 
 function DeliveryContent() {
   const queryClient = useQueryClient();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const {
     data: shipments = [],
     isLoading,
@@ -45,26 +49,50 @@ function DeliveryContent() {
     queryFn: getShipments,
   });
   const routeShipments = shipments.filter((s) =>
-    ["cleared", "out_for_delivery"].includes(s.status),
+    ["port_gh", "cleared", "ghana_warehouse", "out_for_delivery"].includes(s.status),
   );
-  const readyToDispatch = shipments.filter((s) => s.status === "cleared");
+  const atPort = shipments.filter((s) => s.status === "port_gh");
+  const atGhanaWarehouse = shipments.filter((s) => s.status === "ghana_warehouse");
   const outForDelivery = shipments.filter((s) => s.status === "out_for_delivery");
   const deliveredCount = shipments.filter((s) => s.status === "delivered").length;
   const totalWeight = routeShipments.reduce((sum, shipment) => sum + shipment.weightKg, 0);
   const statusMutation = useMutation({
-    mutationFn: ({ code, status }: { code: string; status: "out_for_delivery" | "delivered" }) =>
-      updateShipmentStatus(
-        code,
-        status,
-        status === "delivered" ? "Marked delivered with proof pending" : "Dispatched for delivery",
-      ),
-    onSuccess: async () => {
+    mutationFn: ({ code, status, note }: { code: string; status: DeliveryStatus; note: string }) =>
+      updateShipmentStatus(code, status, note),
+    onSuccess: async (_, variables) => {
+      setActionError(null);
+      setActionMessage(`${variables.code} updated: ${variables.note}`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["delivery-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
       ]);
     },
+    onError: (err) => {
+      setActionMessage(null);
+      setActionError(err instanceof Error ? err.message : "Could not update delivery status.");
+    },
   });
+
+  const updateDeliveryStatus = (shipment: Shipment, status: DeliveryStatus) => {
+    const allowed =
+      (status === "cleared" && shipment.status === "port_gh") ||
+      (status === "ghana_warehouse" && shipment.status === "cleared") ||
+      (status === "out_for_delivery" && shipment.status === "ghana_warehouse") ||
+      (status === "delivered" && shipment.status === "out_for_delivery");
+    if (!allowed) {
+      setActionMessage(null);
+      setActionError(
+        `${shipment.code} cannot be moved from ${STATUS_LABEL[shipment.status]} to ${STATUS_LABEL[status]}.`,
+      );
+      return;
+    }
+
+    statusMutation.mutate({
+      code: shipment.code,
+      status,
+      note: deliveryNote[status],
+    });
+  };
 
   return (
     <PortalShell
@@ -73,14 +101,10 @@ function DeliveryContent() {
       subtitle="Route planning, dispatch, and proof of delivery"
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="At Ghana port" value={isLoading ? "..." : atPort.length} accent="brand" />
         <StatCard
-          label="Stops queued"
-          value={isLoading ? "..." : routeShipments.length}
-          accent="brand"
-        />
-        <StatCard
-          label="Ready dispatch"
-          value={isLoading ? "..." : readyToDispatch.length}
+          label="Ghana warehouse"
+          value={isLoading ? "..." : atGhanaWarehouse.length}
           accent="orange"
         />
         <StatCard
@@ -91,9 +115,16 @@ function DeliveryContent() {
         <StatCard label="Delivered" value={isLoading ? "..." : deliveredCount} accent="green" />
       </div>
 
-      {error && (
-        <div className="mt-6 rounded-2xl border border-navy/5 bg-white p-5 text-sm text-navy/60 shadow-sm">
-          {error instanceof Error ? error.message : "Could not load delivery routes."}
+      {(error || actionError) && (
+        <div className="mt-6 rounded-2xl border border-accent-red/10 bg-accent-red/5 p-5 text-sm text-navy/70 shadow-sm">
+          {actionError ??
+            (error instanceof Error ? error.message : "Could not load delivery routes.")}
+        </div>
+      )}
+
+      {actionMessage && !actionError && (
+        <div className="mt-6 rounded-2xl border border-accent-green/10 bg-accent-green/5 p-5 text-sm text-navy/70 shadow-sm">
+          {actionMessage}
         </div>
       )}
 
@@ -117,12 +148,10 @@ function DeliveryContent() {
                 shipment={shipment}
                 index={index}
                 loading={statusMutation.isPending}
-                onDispatch={() =>
-                  statusMutation.mutate({ code: shipment.code, status: "out_for_delivery" })
-                }
-                onDelivered={() =>
-                  statusMutation.mutate({ code: shipment.code, status: "delivered" })
-                }
+                onClear={() => updateDeliveryStatus(shipment, "cleared")}
+                onReceiveWarehouse={() => updateDeliveryStatus(shipment, "ghana_warehouse")}
+                onDispatch={() => updateDeliveryStatus(shipment, "out_for_delivery")}
+                onDelivered={() => updateDeliveryStatus(shipment, "delivered")}
               />
             ))}
             {routeShipments.length === 0 && (
@@ -181,15 +210,20 @@ function DeliveryStop({
   shipment,
   index,
   loading,
+  onClear,
+  onReceiveWarehouse,
   onDispatch,
   onDelivered,
 }: {
   shipment: Shipment;
   index: number;
   loading: boolean;
+  onClear: () => void;
+  onReceiveWarehouse: () => void;
   onDispatch: () => void;
   onDelivered: () => void;
 }) {
+  const description = parseShipmentDescription(shipment.description);
   return (
     <div className="grid gap-4 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
       <div className="flex items-start gap-4">
@@ -213,28 +247,90 @@ function DeliveryStop({
             <MapPin className="mr-1 inline h-3.5 w-3.5" /> {shipment.destination} ·{" "}
             {shipment.pieces} pcs · {shipment.weightKg}kg
           </p>
-          <p className="mt-1 text-xs text-navy/40">{shipment.description}</p>
+          <ShipmentDescription description={description} />
         </div>
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">
-        <button className="inline-flex items-center gap-1 rounded-full border border-navy/10 px-3 py-2 text-xs font-semibold text-navy/70 hover:bg-surface">
-          <Phone className="h-3.5 w-3.5" /> Call
+        {shipment.clientEmail && (
+          <a
+            href={`mailto:${shipment.clientEmail}`}
+            className="inline-flex items-center gap-1 rounded-full border border-navy/10 px-3 py-2 text-xs font-semibold text-navy/70 hover:bg-surface"
+          >
+            <Phone className="h-3.5 w-3.5" /> Contact
+          </a>
+        )}
+        <button
+          onClick={onClear}
+          disabled={loading || shipment.status !== "port_gh"}
+          className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:opacity-50"
+        >
+          <ShieldCheck className="h-3.5 w-3.5" /> Clear
+        </button>
+        <button
+          onClick={onReceiveWarehouse}
+          disabled={loading || shipment.status !== "cleared"}
+          className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:opacity-50"
+        >
+          <PackageCheck className="h-3.5 w-3.5" /> Receive GH
         </button>
         <button
           onClick={onDispatch}
-          disabled={loading || shipment.status === "out_for_delivery"}
+          disabled={loading || shipment.status !== "ghana_warehouse"}
           className="inline-flex items-center gap-1 rounded-full bg-navy px-3 py-2 text-xs font-semibold text-white hover:bg-navy/90 disabled:opacity-50"
         >
           <Navigation className="h-3.5 w-3.5" /> Dispatch
         </button>
         <button
           onClick={onDelivered}
-          disabled={loading}
+          disabled={loading || shipment.status !== "out_for_delivery"}
           className="inline-flex items-center gap-1 rounded-full bg-accent-green px-3 py-2 text-xs font-semibold text-white hover:bg-accent-green/90 disabled:opacity-50"
         >
           <PackageCheck className="h-3.5 w-3.5" /> Delivered
         </button>
       </div>
+    </div>
+  );
+}
+
+type DeliveryStatus = "cleared" | "ghana_warehouse" | "out_for_delivery" | "delivered";
+
+const deliveryNote: Record<DeliveryStatus, string> = {
+  cleared: "Customs cleared at Ghana port",
+  ghana_warehouse: "Received at Ghana warehouse for delivery planning",
+  out_for_delivery: "Dispatched for delivery",
+  delivered: "Marked delivered with proof pending",
+};
+
+function parseShipmentDescription(value: string) {
+  const match = value.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
+  if (!match) return { path: "", service: "", item: value };
+  return { path: match[1], service: match[2], item: match[3] };
+}
+
+function ShipmentDescription({
+  description,
+}: {
+  description: { path: string; service: string; item: string };
+}) {
+  if (!description.path && !description.service) {
+    return description.item ? (
+      <p className="mt-1 text-xs text-navy/40">{description.item}</p>
+    ) : null;
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+          {description.path}
+        </span>
+        {description.service && (
+          <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[11px] font-semibold text-navy/60">
+            {description.service}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-navy/50">{description.item}</p>
     </div>
   );
 }

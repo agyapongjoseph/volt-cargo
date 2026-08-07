@@ -252,7 +252,7 @@ function DashboardPage() {
             <p className="text-xs text-navy/50">Track and manage every consignment</p>
           </div>
           <div className="flex items-center gap-2">
-            <div ref={exportRef} className="relative">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy/40" />
               <input
                 value={query}
@@ -261,7 +261,7 @@ function DashboardPage() {
                 className="w-64 rounded-full border border-navy/10 bg-surface py-2 pl-9 pr-3 text-sm focus:border-brand focus:outline-none"
               />
             </div>
-            <div className="relative">
+            <div ref={exportRef} className="relative">
               <button
                 onClick={() => setExportOpen((value) => !value)}
                 className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-white px-4 py-2 text-xs font-semibold text-navy/70 hover:bg-surface"
@@ -450,25 +450,20 @@ function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf")
   }));
 
   if (format === "csv") {
-    downloadFile("voltcargo-shipments.csv", toCsv(rows), "text/csv;charset=utf-8");
+    downloadFile("voltcargo-shipments.csv", `\uFEFF${toCsv(rows)}`, "text/csv;charset=utf-8");
     return;
   }
 
   if (format === "excel") {
     downloadFile(
       "voltcargo-shipments.xls",
-      toExcelTable(rows),
+      toExcelDocument(rows),
       "application/vnd.ms-excel;charset=utf-8",
     );
     return;
   }
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(toPrintablePdf(rows));
-  win.document.close();
-  win.focus();
-  win.print();
+  downloadFile("voltcargo-shipments.pdf", toPdfDocument(rows), "application/pdf");
 }
 
 function parseShipmentDescription(value: string) {
@@ -527,6 +522,100 @@ function toExcelTable(rows: Record<string, string | number>[]) {
   `;
 }
 
+function toExcelDocument(rows: Record<string, string | number>[]) {
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+          th { background: #f8fafc; font-weight: 700; }
+        </style>
+      </head>
+      <body>${toExcelTable(rows)}</body>
+    </html>
+  `;
+}
+
+function toPdfDocument(rows: Record<string, string | number>[]) {
+  const lines = [
+    "VoltCargo Shipments",
+    `Generated ${new Date().toLocaleString()}`,
+    "",
+    ...(rows.length
+      ? rows.map(
+          (row) =>
+            `${row.Code} | ${row.Mode} | ${row.Route} | ${row.Weight} | ${row.Status} | ${row.Invoice}`,
+        )
+      : ["No shipments"]),
+  ];
+  const pages: string[][] = [];
+  for (let index = 0; index < lines.length; index += 36) pages.push(lines.slice(index, index + 36));
+
+  const objects: string[] = [];
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  const pageObjectIds = pages.map((_, index) => 3 + index * 2);
+  objects.push(
+    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`,
+  );
+
+  pages.forEach((page, index) => {
+    const pageId = 3 + index * 2;
+    const contentId = pageId + 1;
+    const content = [
+      "BT",
+      "/F1 10 Tf",
+      "50 790 Td",
+      ...page.flatMap((line, lineIndex) => [
+        lineIndex === 0 && index === 0
+          ? "/F1 16 Tf"
+          : lineIndex === 1 && index === 0
+            ? "/F1 10 Tf"
+            : "",
+        `(${escapePdfText(String(line).slice(0, 110))}) Tj`,
+        "0 -20 Td",
+      ]),
+      "ET",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 ${objects.length + 3} 0 R >> >> /Contents ${contentId} 0 R >>`,
+    );
+    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+  });
+
+  const fontObjectId = objects.length + 1;
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  for (let index = 0; index < pages.length; index++) {
+    const pageObjectIndex = 2 + index * 2;
+    objects[pageObjectIndex] = objects[pageObjectIndex].replace(
+      /\/F1 \d+ 0 R/,
+      `/F1 ${fontObjectId} 0 R`,
+    );
+  }
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return pdf;
+}
+
+function escapePdfText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
 function toPrintablePdf(rows: Record<string, string | number>[]) {
   return `
     <!doctype html>
@@ -560,7 +649,7 @@ function downloadFile(filename: string, content: string, type: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function escapeHtml(value: string | number | undefined) {

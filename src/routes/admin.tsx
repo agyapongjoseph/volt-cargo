@@ -5,14 +5,17 @@ import { PortalShell, StatCard } from "@/components/portal-shell";
 import { RoleGuard } from "@/components/role-guard";
 import {
   getAdminData,
+  STATUS_ORDER,
   STATUS_LABEL,
   statusColor,
   clientSpend,
   upsertInvoiceForShipment,
+  updateShipmentStatus,
   type Invoice,
   type Shipment,
+  type ShipmentStatus,
 } from "@/lib/data";
-import { Search, Filter, MoreVertical, Plus } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Area,
@@ -49,21 +52,43 @@ function AdminPage() {
 function AdminContent() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("overview");
+  const [shipmentQuery, setShipmentQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Shipment["status"]>("all");
   const [invoiceDrafts, setInvoiceDrafts] = useState<Record<string, string>>({});
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({ queryKey: ["admin-data"], queryFn: getAdminData });
   const invoiceMutation = useMutation({
     mutationFn: ({ code, amount }: { code: string; amount: number }) =>
       upsertInvoiceForShipment(code, amount),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
   });
+  const statusMutation = useMutation({
+    mutationFn: ({ code, status }: { code: string; status: ShipmentStatus }) =>
+      updateShipmentStatus(code, status, `Admin updated shipment to ${STATUS_LABEL[status]}`),
+    onSuccess: async (_, variables) => {
+      setStatusError(null);
+      setStatusMessage(`${variables.code} moved to ${STATUS_LABEL[variables.status]}.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["warehouse-shipments"] }),
+        queryClient.invalidateQueries({ queryKey: ["qc-shipments"] }),
+        queryClient.invalidateQueries({ queryKey: ["delivery-shipments"] }),
+      ]);
+    },
+    onError: (err) => {
+      setStatusMessage(null);
+      setStatusError(err instanceof Error ? err.message : "Could not update shipment status.");
+    },
+  });
   const shipments = data?.shipments ?? [];
   const clients = data?.clients ?? [];
   const invoices = data?.invoices ?? [];
   const teamUsers = data?.teamUsers ?? [];
-  const revenue = invoices.reduce((s, i) => s + i.amount, 0);
+  const billedRevenue = invoices.reduce((s, i) => s + i.amount, 0);
   const outstanding = invoices.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
   const inFlight = shipments.filter((s) => !["delivered"].includes(s.status)).length;
-  const paidRevenue = invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
+  const revenue = invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
   const airShipments = shipments.filter((s) => s.mode === "Air").length;
   const seaShipments = shipments.filter((s) => s.mode === "Sea").length;
   const delivered = shipments.filter((s) => s.status === "delivered").length;
@@ -85,10 +110,26 @@ function AdminContent() {
       value: shipments.filter((s) => ["port_gh", "cleared"].includes(s.status)).length,
     },
     {
+      name: "GH Warehouse",
+      value: shipments.filter((s) => s.status === "ghana_warehouse").length,
+    },
+    {
       name: "Delivery",
       value: shipments.filter((s) => ["out_for_delivery", "delivered"].includes(s.status)).length,
     },
   ];
+  const filteredShipments = shipments.filter((shipment) => {
+    const q = shipmentQuery.trim().toLowerCase();
+    const matchesQuery =
+      !q ||
+      shipment.code.toLowerCase().includes(q) ||
+      shipment.client.toLowerCase().includes(q) ||
+      shipment.origin.toLowerCase().includes(q) ||
+      shipment.destination.toLowerCase().includes(q) ||
+      shipment.description.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === "all" || shipment.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
 
   useEffect(() => {
     const syncHash = () => {
@@ -127,7 +168,7 @@ function AdminContent() {
 
   return (
     <PortalShell role="admin" title="Admin Console" subtitle="Operations control tower">
-      {/* <div className="mb-6 inline-flex rounded-full border border-navy/10 bg-white p-1 text-sm">
+      <div className="mb-6 inline-flex rounded-full border border-navy/10 bg-white p-1 text-sm">
         {(["overview", "shipments", "clients", "invoices", "users"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -140,13 +181,30 @@ function AdminContent() {
             {t}
           </button>
         ))}
-      </div> */}
+      </div>
+
+      {(statusMessage || statusError) && (
+        <div
+          className={cn(
+            "mb-6 rounded-2xl border p-4 text-sm shadow-sm",
+            statusError
+              ? "border-accent-red/10 bg-accent-red/5 text-navy/70"
+              : "border-accent-green/10 bg-accent-green/5 text-navy/70",
+          )}
+        >
+          {statusError ?? statusMessage}
+        </div>
+      )}
 
       {tab === "overview" && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label="Revenue" value={`$${revenue.toLocaleString()}`} accent="brand" />
-            <StatCard label="Collected" value={`$${paidRevenue.toLocaleString()}`} accent="green" />
+            <StatCard label="Revenue" value={`$${revenue.toLocaleString()}`} accent="green" />
+            <StatCard
+              label="Total billed"
+              value={`$${billedRevenue.toLocaleString()}`}
+              accent="brand"
+            />
             <StatCard
               label="Outstanding"
               value={`$${outstanding.toLocaleString()}`}
@@ -196,9 +254,9 @@ function AdminContent() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-navy/5 bg-navy p-6 text-white shadow-sm">
+            <div className="rounded-2xl border border-navy/5 bg-navy/5 p-6 shadow-sm">
               <h3 className="text-base font-semibold">Freight mix</h3>
-              <p className="mb-6 text-xs text-white/45">Mode split across all shipments</p>
+              <p className="mb-6 text-xs text-navy/45">Mode split across all shipments</p>
               <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -219,7 +277,7 @@ function AdminContent() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <FreightMetric label="Air" value={airShipments} color="bg-accent-orange" />
-                <FreightMetric label="Sea" value={seaShipments} color="bg-white" />
+                <FreightMetric label="Sea" value={seaShipments} color="bg-navy" />
               </div>
             </div>
           </div>
@@ -299,7 +357,7 @@ function AdminContent() {
             />
             <InsightCard
               label="Average invoice"
-              value={`$${(invoices.length ? revenue / invoices.length : 0).toLocaleString(
+              value={`$${(invoices.length ? billedRevenue / invoices.length : 0).toLocaleString(
                 undefined,
                 {
                   maximumFractionDigits: 0,
@@ -319,13 +377,27 @@ function AdminContent() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy/40" />
                 <input
-                  placeholder="Search..."
+                  value={shipmentQuery}
+                  onChange={(event) => setShipmentQuery(event.target.value)}
+                  placeholder="Search code, client, route..."
                   className="w-64 rounded-full border border-navy/10 bg-surface py-2 pl-9 pr-3 text-sm"
                 />
               </div>
-              <button className="inline-flex items-center gap-2 rounded-full border border-navy/10 px-3 py-2 text-xs font-semibold">
-                <Filter className="h-3.5 w-3.5" /> Filter
-              </button>
+              <div className="relative">
+                <Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-navy/40" />
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                  className="rounded-full border border-navy/10 bg-white py-2 pl-8 pr-3 text-xs font-semibold text-navy/70 focus:border-brand focus:outline-none"
+                >
+                  <option value="all">All statuses</option>
+                  {Object.entries(STATUS_LABEL).map(([status, label]) => (
+                    <option key={status} value={status}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <table className="w-full text-sm">
@@ -340,7 +412,7 @@ function AdminContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-navy/5">
-              {shipments.map((s) => (
+              {filteredShipments.map((s) => (
                 <tr key={s.code} className="hover:bg-surface/60">
                   <td className="px-5 py-3">
                     <Link
@@ -364,6 +436,24 @@ function AdminContent() {
                     >
                       {STATUS_LABEL[s.status as keyof typeof STATUS_LABEL]}
                     </span>
+                    <select
+                      value={s.status}
+                      onChange={(event) =>
+                        statusMutation.mutate({
+                          code: s.code,
+                          status: event.target.value as ShipmentStatus,
+                        })
+                      }
+                      disabled={statusMutation.isPending}
+                      className="mt-2 block w-full rounded-lg border border-navy/10 bg-white px-2 py-1 text-xs font-semibold text-navy/60 focus:border-brand focus:outline-none disabled:opacity-60"
+                      aria-label={`Update status for ${s.code}`}
+                    >
+                      {STATUS_ORDER.map((status) => (
+                        <option key={status} value={status}>
+                          {STATUS_LABEL[status]}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -397,10 +487,23 @@ function AdminContent() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <MoreVertical className="h-4 w-4 text-navy/40" />
+                    <Link
+                      to="/shipments/$id"
+                      params={{ id: s.code }}
+                      className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-brand hover:bg-brand/10"
+                    >
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))}
+              {filteredShipments.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-navy/50">
+                    No shipments match your search or filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -498,11 +601,11 @@ function AdminContent() {
 
       {tab === "users" && (
         <div className="rounded-2xl border border-navy/5 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-navy/5 p-5">
+          <div className="border-b border-navy/5 p-5">
             <h2 className="text-base font-semibold">Team & Roles</h2>
-            <button className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
-              <Plus className="h-4 w-4" /> Invite User
-            </button>
+            {/* <p className="mt-1 text-xs text-navy/50">
+              Users sign up normally. Roles appear here after admin assignment in Supabase.
+            </p> */}
           </div>
           <table className="w-full text-sm">
             <thead className="bg-surface text-xs uppercase text-navy/50">
@@ -577,12 +680,12 @@ function buildStatusData(shipments: Shipment[]) {
 
 function FreightMetric({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-2xl bg-white/10 p-4">
+    <div className="rounded-2xl border border-navy/5 bg-surface p-4">
       <div className="mb-2 flex items-center gap-2">
         <span className={cn("h-2.5 w-2.5 rounded-full", color)} />
-        <span className="text-xs font-semibold text-white/55">{label}</span>
+        <span className="text-xs font-semibold text-navy/55">{label}</span>
       </div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-2xl font-bold text-navy">{value}</p>
     </div>
   );
 }

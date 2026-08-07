@@ -13,7 +13,7 @@ end $$;
 do $$ begin
   create type public.shipment_status as enum (
     'created', 'received_cn', 'qc', 'consolidated', 'in_transit',
-    'port_gh', 'cleared', 'out_for_delivery', 'delivered'
+    'port_gh', 'cleared', 'ghana_warehouse', 'out_for_delivery', 'delivered'
   );
 exception when duplicate_object then null;
 end $$;

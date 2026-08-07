@@ -11,6 +11,7 @@ export type ShipmentStatus =
   | "in_transit"
   | "port_gh"
   | "cleared"
+  | "ghana_warehouse"
   | "out_for_delivery"
   | "delivered";
 
@@ -22,6 +23,7 @@ export const STATUS_LABEL: Record<ShipmentStatus, string> = {
   in_transit: "In Transit",
   port_gh: "At Port (Ghana)",
   cleared: "Customs Cleared",
+  ghana_warehouse: "Ghana Warehouse",
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
 };
@@ -34,6 +36,7 @@ export const STATUS_ORDER: ShipmentStatus[] = [
   "in_transit",
   "port_gh",
   "cleared",
+  "ghana_warehouse",
   "out_for_delivery",
   "delivered",
 ];
@@ -115,6 +118,11 @@ export type ShipmentMessage = {
   body: string;
   createdAt: string;
   mine: boolean;
+};
+
+export type ShipmentUpload = {
+  filename: string;
+  storagePath: string;
 };
 
 export type SessionProfile = {
@@ -610,8 +618,9 @@ export async function updateShipmentStatus(code: string, status: ShipmentStatus,
     .update({ status })
     .eq("code", code.trim().toUpperCase())
     .select("id")
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error("Shipment code not found.");
 
   const { data: auth } = await db.auth.getUser();
   const { error: eventError } = await db.from("shipment_events").insert({
@@ -621,6 +630,35 @@ export async function updateShipmentStatus(code: string, status: ShipmentStatus,
     actor_id: auth.user?.id,
   });
   if (eventError) throw eventError;
+}
+
+export async function uploadShipmentPhoto(code: string, file: File): Promise<ShipmentUpload> {
+  const db = requireSupabase();
+  const [{ data: auth, error: authError }, shipmentId] = await Promise.all([
+    db.auth.getUser(),
+    getShipmentUuid(code),
+  ]);
+  if (authError) throw authError;
+  if (!auth.user) throw new Error("Sign in before uploading evidence.");
+  if (!shipmentId) throw new Error("Shipment code not found.");
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const storagePath = `${shipmentId}/${Date.now()}-${safeName}`;
+  const { error: uploadError } = await db.storage
+    .from("shipment-photos")
+    .upload(storagePath, file, { upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { error: documentError } = await db.from("shipment_documents").insert({
+    shipment_id: shipmentId,
+    storage_path: storagePath,
+    filename: file.name,
+    size_bytes: file.size,
+    uploaded_by: auth.user.id,
+  });
+  if (documentError) throw documentError;
+
+  return { filename: file.name, storagePath };
 }
 
 export async function upsertInvoiceForShipment(code: string, amount: number) {
@@ -702,9 +740,21 @@ export function clientSpend(shipments: Shipment[]): number {
   return shipments.reduce((sum, shipment) => sum + shipment.invoiceTotal, 0);
 }
 
+export function parseShipmentDescription(value: string) {
+  const match = value.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
+  if (!match) return { path: "", service: "", item: value };
+  return { path: match[1], service: match[2], item: match[3] };
+}
+
+export function isLclShipment(shipment: Pick<Shipment, "description" | "mode">) {
+  const parsed = parseShipmentDescription(shipment.description);
+  return shipment.mode === "Sea" && /\bLCL\b/i.test(parsed.service);
+}
+
 export function statusColor(s: ShipmentStatus) {
   switch (s) {
     case "delivered":
+    case "ghana_warehouse":
     case "cleared":
       return "bg-accent-green/10 text-accent-green ring-accent-green/20";
     case "in_transit":
