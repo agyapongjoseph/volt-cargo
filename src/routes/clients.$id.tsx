@@ -68,9 +68,9 @@ function ClientDetail() {
             <div className="flex items-center gap-2 text-navy/70">
               <Phone className="h-4 w-4 text-navy/40" /> {client.phone}
             </div>
-            <div className="flex items-center gap-2 text-navy/70">
+            {/* <div className="flex items-center gap-2 text-navy/70">
               <MapPin className="h-4 w-4 text-navy/40" /> {client.city}
-            </div>
+            </div> */}
             <div className="pt-3 text-xs text-navy/50">
               Joined {client.joined} · Permanent Client ID
             </div>

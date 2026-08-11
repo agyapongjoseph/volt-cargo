@@ -77,6 +77,7 @@ function QCContent() {
         queryClient.invalidateQueries({ queryKey: ["qc-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["warehouse-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
       ]);
     },
     onError: (err) => {
@@ -93,7 +94,10 @@ function QCContent() {
         ...items,
         [variables.code]: [upload, ...(items[variables.code] ?? [])],
       }));
-      await queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
+      ]);
     },
     onError: (err) => {
       setActionMessage(null);
@@ -200,7 +204,7 @@ function QCContent() {
                         current?.code === s.code ? "text-white/55" : "text-navy/45",
                       )}
                     >
-                      {s.pieces} pcs · {s.weightKg}kg · {s.cbm} CBM
+                      {s.pieces} pcs · {shipmentMeasurement(s)}
                     </p>
                   </div>
                   <span className="rounded-full bg-brand/10 px-2 py-1 text-[11px] font-semibold text-brand">
@@ -248,10 +252,13 @@ function QCContent() {
                 </span>
               </div>
 
-              <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-3">
                 <Detail icon={PackageSearch} label="Pieces" value={current.pieces} />
-                <Detail icon={Ruler} label="Weight" value={`${current.weightKg} kg`} />
-                <Detail icon={ClipboardCheck} label="Volume" value={`${current.cbm} CBM`} />
+                <Detail
+                  icon={Ruler}
+                  label={current.mode === "Air" ? "Weight" : "Volume"}
+                  value={shipmentMeasurement(current)}
+                />
                 <Detail icon={AlertTriangle} label="Declared" value={`$${current.declaredValue}`} />
               </div>
 
@@ -260,17 +267,10 @@ function QCContent() {
                   <h3 className="font-semibold">Inspection evidence</h3>
                   <span className="text-xs text-navy/40">Upload photos, labels, and packaging</span>
                 </div>
+                <p className="mb-3 rounded-2xl bg-surface p-3 text-xs text-navy/50">
+                  Upload clear images of the item, packaging condition, labels, and quantity count.
+                </p>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  {["Front", "Packaging", "Quantity"].map((label) => (
-                    <div
-                      key={label}
-                      className="flex aspect-square flex-col justify-end rounded-2xl bg-gradient-to-br from-brand/10 via-surface to-navy/10 p-3 ring-1 ring-navy/5"
-                    >
-                      <span className="rounded-full bg-white/90 px-2 py-1 text-[11px] font-semibold text-navy/60">
-                        {label}
-                      </span>
-                    </div>
-                  ))}
                   <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-navy/15 text-xs font-semibold text-navy/45 hover:border-brand hover:text-brand">
                     <Camera className="mb-2 h-7 w-7" />
                     {uploadMutation.isPending ? "Uploading..." : "Add photo"}
@@ -290,11 +290,23 @@ function QCContent() {
                   <div className="mt-4 rounded-2xl bg-surface p-4">
                     <p className="mb-2 text-xs font-semibold text-navy/50">Uploaded evidence</p>
                     <div className="space-y-2">
-                      {uploads[current.code].map((upload) => (
-                        <p key={upload.storagePath} className="text-xs font-medium text-navy/70">
-                          {upload.filename}
-                        </p>
-                      ))}
+                      {uploads[current.code].map((upload) =>
+                        upload.url ? (
+                          <a
+                            key={upload.storagePath}
+                            href={upload.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block rounded-xl bg-white px-3 py-2 text-xs font-semibold text-brand hover:bg-brand/5"
+                          >
+                            View {upload.filename}
+                          </a>
+                        ) : (
+                          <p key={upload.storagePath} className="text-xs font-medium text-navy/70">
+                            {upload.filename}
+                          </p>
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -343,6 +355,10 @@ function QCContent() {
       </section>
     </PortalShell>
   );
+}
+
+function shipmentMeasurement(shipment: Shipment) {
+  return shipment.mode === "Air" ? `${shipment.weightKg} kg` : `${shipment.cbm} CBM`;
 }
 
 function Detail({

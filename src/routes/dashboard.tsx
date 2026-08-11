@@ -700,7 +700,10 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
       }),
     onSuccess: async (shipment) => {
       setCreatedCode(shipment.code);
-      await queryClient.invalidateQueries({ queryKey: ["client-dashboard"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["client-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
+      ]);
     },
   });
 

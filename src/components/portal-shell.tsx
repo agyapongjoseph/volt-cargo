@@ -17,14 +17,7 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  getClientDashboardData,
-  getSessionProfile,
-  STATUS_LABEL,
-  type AppRole,
-  type Invoice,
-  type Shipment,
-} from "@/lib/data";
+import { getPortalNotifications, getSessionProfile, type AppRole } from "@/lib/data";
 import { supabase } from "@/lib/supabase/client";
 
 export type PortalRole = "client" | "admin" | "warehouse" | "qc" | "delivery";
@@ -106,8 +99,9 @@ export function PortalShell({
   const { data: profile } = useQuery({ queryKey: ["session-profile"], queryFn: getSessionProfile });
   const { data: notificationData } = useQuery({
     queryKey: ["portal-notifications", role],
-    queryFn: getClientDashboardData,
-    enabled: role === "client",
+    queryFn: () => getPortalNotifications(role),
+    enabled: Boolean(profile?.user),
+    refetchInterval: 30000,
   });
   const nav = NAV[role];
   const roles = profile?.roles ?? [];
@@ -122,10 +116,7 @@ export function PortalShell({
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  const notifications = buildNotifications(
-    notificationData?.shipments ?? [],
-    notificationData?.invoices ?? [],
-  );
+  const notifications = notificationData ?? [];
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -266,7 +257,7 @@ export function PortalShell({
               <div className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-xl">
                 <div className="border-b border-navy/5 p-4">
                   <p className="text-sm font-bold text-navy">Notifications</p>
-                  <p className="text-xs text-navy/45">Shipment and invoice updates</p>
+                  <p className="text-xs text-navy/45">Operational updates for this portal</p>
                 </div>
                 <div className="max-h-80 overflow-y-auto p-2">
                   {notifications.map((item) => (
@@ -329,25 +320,4 @@ export function StatCard({
       {hint && <p className="mt-1 text-xs text-navy/50">{hint}</p>}
     </div>
   );
-}
-
-function buildNotifications(shipments: Shipment[], invoices: Invoice[]) {
-  const invoiceItems = invoices
-    .filter((invoice) => !invoice.paid)
-    .slice(0, 3)
-    .map((invoice) => ({
-      id: `invoice-${invoice.id}`,
-      title: "Invoice payment due",
-      body: `${invoice.id} for ${invoice.code || "your shipment"} is $${invoice.amount.toLocaleString()}.`,
-      to: "/dashboard#invoices",
-    }));
-
-  const shipmentItems = shipments.slice(0, 4).map((shipment) => ({
-    id: `shipment-${shipment.code}`,
-    title: STATUS_LABEL[shipment.status],
-    body: `${shipment.code} is currently ${STATUS_LABEL[shipment.status].toLowerCase()}.`,
-    to: `/shipments/${shipment.code}`,
-  }));
-
-  return [...invoiceItems, ...shipmentItems].slice(0, 6);
 }

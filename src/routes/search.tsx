@@ -46,9 +46,9 @@ function SearchPage() {
           <h1 className="mb-3 text-4xl font-bold tracking-tight">Global Search</h1>
           <p className="mb-8 text-navy/60">
             Search by <span className="font-mono font-semibold text-navy">Client ID</span> (
-            <span className="font-mono">CL-000001</span>) or{" "}
+            <span className="font-mono">CL-7C2E9A4B1F80</span>) or{" "}
             <span className="font-mono font-semibold text-navy">Shipment Code</span> (
-            <span className="font-mono">VC-2026-000001</span>).
+            <span className="font-mono">VC-2026-A9F3C8D2E1B4</span>).
           </p>
 
           <form
@@ -64,7 +64,7 @@ function SearchPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="w-full rounded-2xl border border-navy/10 bg-white py-5 pr-40 pl-14 text-sm shadow-xl shadow-navy/5 focus:ring-2 focus:ring-brand/20 focus:outline-none"
-              placeholder="CL-000001  or  VC-2026-000001"
+              placeholder="CL-7C2E9A4B1F80  or  VC-2026-A9F3C8D2E1B4"
             />
             <button
               type="submit"
@@ -99,8 +99,8 @@ function SearchPage() {
                   No matches for <span className="font-mono font-semibold">{result.query}</span>.
                 </p>
                 <p className="mt-2 text-xs text-navy/50">
-                  Double-check the format: <span className="font-mono">CL-000001</span> or{" "}
-                  <span className="font-mono">VC-2026-000001</span>.
+                  Double-check the format: <span className="font-mono">CL-7C2E9A4B1F80</span> or{" "}
+                  <span className="font-mono">VC-2026-A9F3C8D2E1B4</span>.
                 </p>
               </div>
             )}

@@ -47,7 +47,7 @@ const categories = [
     img: catFurniture,
   },
   {
-    name: "Industrial equipment",
+    name: "Building Materials & Industrial equipment",
     detail: "Machinery, tools, workshop gear",
     img: catEquipment,
   },

@@ -42,18 +42,22 @@ function AuthPage() {
     }
 
     setLoading(true);
-    const result =
+    const result = await (
       mode === "signup"
-        ? await supabase.auth.signUp({
-            email,
+        ? supabase.auth.signUp({
+            email: email.trim(),
             password,
-            options: { data: { full_name: fullName, phone } },
+            options: { data: { full_name: fullName.trim(), phone: phone.trim() } },
           })
-        : await supabase.auth.signInWithPassword({ email, password });
+        : supabase.auth.signInWithPassword({ email: email.trim(), password })
+    ).catch((error: unknown) => ({
+      data: null,
+      error,
+    }));
     setLoading(false);
 
     if (result.error) {
-      setMessage(result.error.message);
+      setMessage(getAuthErrorMessage(result.error));
       return;
     }
 
@@ -159,6 +163,15 @@ function AuthPage() {
       <SiteFooter />
     </div>
   );
+}
+
+function getAuthErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
+  return "Authentication failed. Please try again or contact VoltCargo support.";
 }
 
 function portalForRoles(roles: AppRole[]) {

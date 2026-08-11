@@ -88,7 +88,7 @@ function TrackPage() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               className="w-full rounded-2xl border border-navy/10 bg-white py-5 pr-40 pl-14 text-sm shadow-xl shadow-navy/5 focus:ring-2 focus:ring-brand/20 focus:outline-none"
-              placeholder="VC-2026-000001 or CL-000001"
+              placeholder="VC-2026-A9F3C8D2E1B4 or CL-7C2E9A4B1F80"
             />
             <button
               type="submit"
@@ -215,8 +215,8 @@ function TrackPage() {
                 <span className="font-mono font-semibold">{initial}</span>.
               </p>
               <p className="mt-2 text-sm text-navy/40">
-                Try a consignment code like <span className="font-mono">VC-2026-000001</span> or a
-                client ID like <span className="font-mono">CL-000001</span>.
+                Try a consignment code like <span className="font-mono">VC-2026-A9F3C8D2E1B4</span>{" "}
+                or a client ID like <span className="font-mono">CL-7C2E9A4B1F80</span>.
               </p>
             </div>
           ) : (

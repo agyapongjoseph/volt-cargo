@@ -21,17 +21,34 @@ end $$;
 create sequence if not exists public.client_seq start 1;
 create sequence if not exists public.shipment_seq start 1;
 
+create or replace function public.gen_client_code()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  candidate text;
+begin
+  loop
+    candidate := 'CL-' || upper(substr(encode(extensions.gen_random_bytes(8), 'hex'), 1, 12));
+    exit when not exists (select 1 from public.clients where client_code = candidate);
+  end loop;
+  return candidate;
+end;
+$$;
+
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references auth.users(id) on delete cascade,
-  client_code text not null unique default ('CL-' || lpad(nextval('public.client_seq')::text, 6, '0')),
+  client_code text not null unique default public.gen_client_code(),
   full_name text not null,
   email text not null,
   phone text,
   city text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint client_code_format check (client_code ~ '^CL-[0-9]{6}$')
+  constraint client_code_format check (client_code ~ '^CL-[A-F0-9]{12}$')
 );
 
 create table if not exists public.user_roles (
@@ -58,7 +75,7 @@ create table if not exists public.shipments (
   eta date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint shipment_code_format check (code ~ '^VC-[0-9]{4}-[0-9]{6}$')
+  constraint shipment_code_format check (code ~ '^VC-[0-9]{4}-[A-F0-9]{12}$')
 );
 
 create table if not exists public.shipment_events (

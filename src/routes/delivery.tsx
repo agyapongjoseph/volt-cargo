@@ -65,6 +65,7 @@ function DeliveryContent() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["delivery-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
       ]);
     },
     onError: (err) => {

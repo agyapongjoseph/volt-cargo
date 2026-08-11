@@ -61,7 +61,10 @@ function AdminContent() {
   const invoiceMutation = useMutation({
     mutationFn: ({ code, amount }: { code: string; amount: number }) =>
       upsertInvoiceForShipment(code, amount),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+      queryClient.invalidateQueries({ queryKey: ["portal-notifications"] });
+    },
   });
   const statusMutation = useMutation({
     mutationFn: ({ code, status }: { code: string; status: ShipmentStatus }) =>
@@ -74,6 +77,7 @@ function AdminContent() {
         queryClient.invalidateQueries({ queryKey: ["warehouse-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["qc-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["delivery-shipments"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
       ]);
     },
     onError: (err) => {
@@ -617,7 +621,7 @@ function AdminContent() {
             </thead>
             <tbody className="divide-y divide-navy/5">
               {teamUsers.map((u) => (
-                <tr key={u.email}>
+                <tr key={`${u.userId}-${u.role}`}>
                   <td className="px-5 py-3 font-semibold">{u.name}</td>
                   <td className="px-5 py-3 text-navy/70">{u.email}</td>
                   <td className="px-5 py-3">

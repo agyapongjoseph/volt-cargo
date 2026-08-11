@@ -6,6 +6,7 @@ import { RoleGuard } from "@/components/role-guard";
 import {
   getShipments,
   isLclShipment,
+  parseShipmentDescription,
   STATUS_LABEL,
   statusColor,
   updateShipmentStatus,
@@ -68,6 +69,7 @@ function WarehouseContent() {
         queryClient.invalidateQueries({ queryKey: ["warehouse-shipments"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
         queryClient.invalidateQueries({ queryKey: ["delivery-shipments"] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
       ]);
     },
     onError: (err) => {
@@ -223,7 +225,7 @@ function WarehouseContent() {
                 value={scan}
                 onChange={(e) => setScan(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && receiveShipment()}
-                placeholder="VC-2026-000001"
+                placeholder="VC-2026-A9F3C8D2E1B4"
                 className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 font-mono text-sm text-white placeholder:text-white/35 focus:border-brand focus:outline-none"
               />
               <button
@@ -398,13 +400,33 @@ function WarehouseCard({
   actionLabel?: string;
   onConsolidate: () => void;
 }) {
+  const description = parseShipmentDescription(shipment.description);
+  const measurement =
+    shipment.mode === "Air"
+      ? { label: "Weight", value: `${shipment.weightKg} kg` }
+      : { label: "Volume", value: `${shipment.cbm} CBM` };
+
   return (
     <div className="rounded-2xl border border-navy/5 bg-surface p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-sm font-bold text-brand">{shipment.code}</p>
           <h3 className="mt-1 font-semibold">{shipment.client}</h3>
-          <p className="mt-1 text-xs text-navy/50">{shipment.description}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {description.path && (
+              <span className="rounded-full bg-brand/10 px-2 py-1 text-[11px] font-semibold text-brand">
+                {description.path}
+              </span>
+            )}
+            {description.service && (
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-navy/50">
+                {description.service}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-navy/50">
+            {description.item || shipment.description || "Shipment cargo"}
+          </p>
         </div>
         <span
           className={cn(
@@ -415,10 +437,9 @@ function WarehouseCard({
           {STATUS_LABEL[shipment.status]}
         </span>
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
         <MiniDetail label="Pieces" value={shipment.pieces} />
-        <MiniDetail label="Weight" value={`${shipment.weightKg}kg`} />
-        <MiniDetail label="CBM" value={shipment.cbm} />
+        <MiniDetail label={measurement.label} value={measurement.value} />
       </div>
       <div className="mt-5 flex flex-wrap gap-2">
         <button

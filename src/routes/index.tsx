@@ -77,7 +77,7 @@ function Hero() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 type="text"
-                placeholder="Enter Consignment Code (e.g. VC-2026-000001)"
+                placeholder="Enter Consignment Code (e.g. VC-2026-A9F3C8D2E1B4)"
                 className="w-full rounded-2xl border border-navy/10 bg-white pr-32 pl-6 py-4 text-sm shadow-xl shadow-navy/5 transition-all focus:ring-2 focus:ring-brand/20 focus:outline-none"
               />
               <button
@@ -389,10 +389,10 @@ function HowItWorks() {
 const tiers = [
   {
     name: "Air Express",
-    price: "$14",
+    price: "$20",
     unit: "/ kg",
     features: [
-      "3–5 day delivery",
+      "2–5 day delivery",
       "Real-time tracking",
       "Priority handling",
       "Insurance available",
@@ -400,10 +400,10 @@ const tiers = [
   },
   {
     name: "Air Normal",
-    price: "$12",
+    price: "$15",
     unit: "/ kg",
     features: [
-      "7–10 day delivery",
+      "7–14 day delivery",
       "Reliable air cargo",
       "Tracking updates",
       "Great for regular stock",
@@ -411,14 +411,14 @@ const tiers = [
   },
   {
     name: "Ocean LCL",
-    price: "$450",
+    price: "$250",
     unit: "/ CBM",
     features: ["Weekly sailings", "Consolidation service", "QC inspection", "Customs clearance"],
     featured: true,
   },
   {
     name: "Ocean FCL",
-    price: "Custom",
+    price: "5,900",
     unit: "20ft / 40ft",
     features: ["Full container", "Dedicated route", "End-to-end handling", "Door to Door Delivery"],
   },
@@ -551,7 +551,7 @@ const faqs = [
   },
   {
     q: "How do I get my consignment code?",
-    a: "Once you create a shipment in your VoltCargo dashboard, a unique consignment code (e.g. VC-2026-000001) is generated automatically.",
+    a: "Once you create a shipment in your VoltCargo dashboard, a unique secure consignment code (e.g. VC-2026-A9F3C8D2E1B4) is generated automatically.",
   },
   {
     q: "Do you provide insurance.?",
@@ -585,6 +585,9 @@ const faqs = [
 
 function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
+  const [showAll, setShowAll] = useState(false);
+  const visibleFaqs = showAll ? faqs : faqs.slice(0, 5);
+
   return (
     <section className="bg-white px-6 py-24">
       <div className="mx-auto max-w-3xl">
@@ -592,7 +595,7 @@ function FAQ() {
           <h2 className="mb-4 text-4xl font-bold tracking-tight">Frequently Asked Questions</h2>
         </div>
         <div className="divide-y divide-navy/10 rounded-3xl border border-navy/5 bg-surface">
-          {faqs.map((f, i) => (
+          {visibleFaqs.map((f, i) => (
             <div key={f.q} className="p-6">
               <button
                 onClick={() => setOpen(open === i ? null : i)}
@@ -607,6 +610,19 @@ function FAQ() {
             </div>
           ))}
         </div>
+        {faqs.length > 5 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => {
+                setShowAll((value) => !value);
+                setOpen(0);
+              }}
+              className="rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand/90"
+            >
+              {showAll ? "View less" : "View more"}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

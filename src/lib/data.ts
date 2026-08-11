@@ -41,15 +41,15 @@ export const STATUS_ORDER: ShipmentStatus[] = [
   "delivered",
 ];
 
-export const CLIENT_ID_REGEX = /^CL-\d{6}$/;
-export const SHIPMENT_CODE_REGEX = /^VC-\d{4}-\d{6}$/;
+export const CLIENT_ID_REGEX = /^CL-(?:\d{6}|[A-F0-9]{12})$/;
+export const SHIPMENT_CODE_REGEX = /^VC-\d{4}-(?:\d{6}|[A-F0-9]{12})$/;
 
 export function formatClientId(seq: number): string {
-  return `CL-${String(seq).padStart(6, "0")}`;
+  return `CL-${String(seq).padStart(12, "0")}`;
 }
 
 export function formatShipmentCode(year: number, seq: number): string {
-  return `VC-${year}-${String(seq).padStart(6, "0")}`;
+  return `VC-${year}-${String(seq).padStart(12, "0")}`;
 }
 
 export function isClientId(q: string) {
@@ -101,6 +101,7 @@ export type Invoice = {
 };
 
 export type TeamUser = {
+  userId: string;
   name: string;
   email: string;
   role: string;
@@ -123,6 +124,15 @@ export type ShipmentMessage = {
 export type ShipmentUpload = {
   filename: string;
   storagePath: string;
+  url?: string;
+};
+
+export type PortalNotification = {
+  id: string;
+  title: string;
+  body: string;
+  to: string;
+  createdAt: string;
 };
 
 export type SessionProfile = {
@@ -185,16 +195,35 @@ type InvoiceWithShipmentRow = InvoiceRow & {
 };
 
 type ShipmentEventRow = {
+  id?: string;
   status: ShipmentStatus;
   note: string | null;
   created_at: string;
+  shipments?:
+    | {
+        code: string;
+        clients: ClientRow | ClientRow[] | null;
+      }
+    | {
+        code: string;
+        clients: ClientRow | ClientRow[] | null;
+      }[]
+    | null;
 };
 
 type MessageRow = {
   id: string;
   author_id: string;
+  author_label?: string | null;
   body: string;
   created_at: string;
+};
+
+type TeamUserRow = {
+  user_id: string;
+  role: AppRole;
+  full_name: string | null;
+  email: string | null;
 };
 
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -415,18 +444,26 @@ export async function getShipmentMessages(code: string): Promise<ShipmentMessage
   ]);
   if (!shipmentId) return [];
 
-  const { data, error } = await db
-    .from("messages")
-    .select("id, author_id, body, created_at")
-    .eq("shipment_id", shipmentId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
+  const { data: rpcData, error: rpcError } = await db.rpc("get_shipment_messages", {
+    shipment_code: code.trim().toUpperCase(),
+  });
 
-  return ((data ?? []) as MessageRow[]).map((message) => {
+  let rows = (rpcData ?? []) as MessageRow[];
+  if (rpcError) {
+    const { data, error } = await db
+      .from("messages")
+      .select("id, author_id, body, created_at")
+      .eq("shipment_id", shipmentId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    rows = (data ?? []) as MessageRow[];
+  }
+
+  return rows.map((message) => {
     const mine = message.author_id === auth.user?.id;
     return {
       id: message.id,
-      author: mine ? "You" : "VoltCargo Ops",
+      author: mine ? "You" : (message.author_label ?? "VoltCargo Ops"),
       body: message.body,
       createdAt: message.created_at,
       mine,
@@ -515,6 +552,16 @@ export async function getInvoicesForClient(clientId: string): Promise<Invoice[]>
 
 export async function getTeamUsers(): Promise<TeamUser[]> {
   const db = requireSupabase();
+  const { data: teamData, error: teamError } = await db.rpc("get_team_users");
+  if (!teamError) {
+    return ((teamData ?? []) as TeamUserRow[]).map((row) => ({
+      userId: row.user_id,
+      name: row.full_name || row.email || row.user_id,
+      email: row.email || row.user_id,
+      role: ROLE_LABEL[row.role],
+    }));
+  }
+
   const { data: rolesData, error: rolesError } = await db
     .from("user_roles")
     .select("user_id, role")
@@ -539,6 +586,7 @@ export async function getTeamUsers(): Promise<TeamUser[]> {
   return roles.map((row) => {
     const client = clientsByUserId.get(row.user_id);
     return {
+      userId: row.user_id,
       name: client?.full_name ?? "Invited user",
       email: client?.email ?? row.user_id,
       role: ROLE_LABEL[row.role],
@@ -558,6 +606,72 @@ export async function getClientDashboardData() {
   ]);
 
   return { currentClient: profile.client, shipments, invoices };
+}
+
+const NOTIFICATION_STATUSES: Record<"admin" | "warehouse" | "qc" | "delivery", ShipmentStatus[]> = {
+  admin: [...STATUS_ORDER],
+  warehouse: ["created", "qc", "consolidated"],
+  qc: ["received_cn"],
+  delivery: ["port_gh", "cleared", "ghana_warehouse", "out_for_delivery", "delivered"],
+};
+
+export async function getPortalNotifications(
+  role: "client" | "admin" | "warehouse" | "qc" | "delivery",
+) {
+  const db = requireSupabase();
+  const profile = await getSessionProfile();
+  if (!profile.user) return [] as PortalNotification[];
+
+  const invoiceItems =
+    role === "client" && profile.client
+      ? (await getInvoicesForClient(profile.client.clientId))
+          .filter((invoice) => !invoice.paid)
+          .slice(0, 3)
+          .map((invoice) => ({
+            id: `invoice-${invoice.id}`,
+            title: "Invoice payment due",
+            body: `${invoice.id} for ${invoice.code || "your shipment"} is $${invoice.amount.toLocaleString()}.`,
+            to: "/dashboard#invoices",
+            createdAt: invoice.issued,
+          }))
+      : [];
+
+  const statuses = role === "client" ? STATUS_ORDER : NOTIFICATION_STATUSES[role];
+  const { data, error } = await db
+    .from("shipment_events")
+    .select(
+      `
+      id,
+      status,
+      note,
+      created_at,
+      shipments!inner(code, clients!inner(client_code, full_name, email, phone, city, created_at))
+    `,
+    )
+    .in("status", statuses)
+    .order("created_at", { ascending: false })
+    .limit(role === "client" ? 6 : 10);
+  if (error) throw error;
+
+  const eventItems = ((data ?? []) as unknown as ShipmentEventRow[]).map((event) => {
+    const shipment = first(event.shipments);
+    const client = first(shipment?.clients);
+    return {
+      id: `event-${event.id ?? `${shipment?.code}-${event.status}-${event.created_at}`}`,
+      title: STATUS_LABEL[event.status],
+      body: `${shipment?.code ?? "Shipment"}${client?.full_name ? ` for ${client.full_name}` : ""}: ${event.note ?? STATUS_LABEL[event.status]}.`,
+      to: shipment?.code
+        ? `/shipments/${shipment.code}`
+        : role === "client"
+          ? "/dashboard"
+          : `/${role}`,
+      createdAt: event.created_at,
+    };
+  });
+
+  return [...invoiceItems, ...eventItems]
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+    .slice(0, 8);
 }
 
 export async function createShipmentForCurrentClient(input: {
@@ -658,7 +772,11 @@ export async function uploadShipmentPhoto(code: string, file: File): Promise<Shi
   });
   if (documentError) throw documentError;
 
-  return { filename: file.name, storagePath };
+  const { data: signedUrl } = await db.storage
+    .from("shipment-photos")
+    .createSignedUrl(storagePath, 60 * 10);
+
+  return { filename: file.name, storagePath, url: signedUrl?.signedUrl };
 }
 
 export async function upsertInvoiceForShipment(code: string, amount: number) {
