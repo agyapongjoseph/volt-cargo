@@ -14,12 +14,23 @@ import {
 import { Plus, Search, Download, X, CheckCircle2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const chinaWarehouseAddress = [
-  "North Area of Shanghua Industrial Zone",
-  "Lecong Town, Shunde District",
-  "Foshan City, Guangdong Province, China",
-  "佛山市顺德区乐从镇上华工业北区1号",
-];
+const warehouseAddresses = {
+  "Air Freight": [
+    "2F12, 2nd Floor, Jiuzhilong Trade City",
+    "No. 18 Guangyuan West Road",
+    "Kuangquan Street, Yuexiu District",
+    "Guangzhou City, Guangdong Province, China",
+    "广东省广州市越秀区广州市矿泉街道广园西路18号九之龙商贸城2楼2F12",
+  ],
+  "Ocean Freight": [
+    "North Area of Shanghua Industrial Zone",
+    "Lecong Town, Shunde District",
+    "Foshan City, Guangdong Province, China",
+    "佛山市顺德区乐从镇上华工业北区1号",
+  ],
+} as const;
+
+type FreightFamily = keyof typeof warehouseAddresses;
 
 const shippingServices = [
   {
@@ -47,7 +58,7 @@ const shippingServices = [
   {
     id: "air-battery",
     family: "Air Freight",
-    name: "Battery ",
+    name: "Batteries & Electronics",
     mode: "Air" as const,
     timeline: "Special handling by air",
     estimate: "$25/kg",
@@ -61,10 +72,10 @@ const shippingServices = [
     name: "Phones",
     mode: "Air" as const,
     timeline: "Special handling by air",
-    estimate: "$25/kg",
+    estimate: "$25/unit",
     rate: 25,
-    unit: "kg",
-    note: "For mobile phones and similar high-value electronics.",
+    unit: "unit",
+    note: "For mobile phones charged per device unit.",
   },
   {
     id: "ocean-lcl",
@@ -662,11 +673,17 @@ function escapeHtml(value: string | number | undefined) {
 
 function calculateEstimate(
   service: (typeof shippingServices)[number],
+  pieces: string,
   weightKg: string,
   cbm: string,
 ) {
   if (service.unit === "flat") return service.rate;
-  const quantity = service.unit === "kg" ? Number(weightKg || 0) : Number(cbm || 0);
+  const quantity =
+    service.unit === "unit"
+      ? Number(pieces || 0)
+      : service.unit === "kg"
+        ? Number(weightKg || 0)
+        : Number(cbm || 0);
   return Math.max(0, Math.round(quantity * service.rate * 100) / 100);
 }
 
@@ -674,6 +691,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [path, setPath] = useState<(typeof shipmentPaths)[number]["id"]>("own-supplier");
+  const [freightFamily, setFreightFamily] = useState<FreightFamily>("Air Freight");
   const [serviceId, setServiceId] = useState(shippingServices[0].id);
   const [origin, setOrigin] = useState("Guangzhou, CN");
   const [destination, setDestination] = useState("Accra, GH");
@@ -682,10 +700,18 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
   const [weightKg, setWeightKg] = useState("");
   const [cbm, setCbm] = useState("");
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const familyServices = shippingServices.filter((service) => service.family === freightFamily);
   const selectedService =
     shippingServices.find((service) => service.id === serviceId) ?? shippingServices[0];
   const selectedPath = shipmentPaths.find((item) => item.id === path) ?? shipmentPaths[0];
-  const estimatedPrice = calculateEstimate(selectedService, weightKg, cbm);
+  const selectedWarehouseAddress = warehouseAddresses[freightFamily];
+  const estimatedPrice = calculateEstimate(selectedService, pieces, weightKg, cbm);
+  const selectFreightFamily = (family: FreightFamily) => {
+    setFreightFamily(family);
+    setServiceId(shippingServices.find((service) => service.family === family)?.id ?? serviceId);
+    setWeightKg("");
+    setCbm("");
+  };
   const createShipment = useMutation({
     mutationFn: () =>
       createShipmentForCurrentClient({
@@ -756,28 +782,48 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                 <label className="mb-1 block text-xs font-semibold text-navy/70">
                   Shipping package
                 </label>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {shippingServices.map((service) => (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(["Air Freight", "Ocean Freight"] as FreightFamily[]).map((family) => (
                     <button
-                      key={service.id}
+                      key={family}
                       type="button"
-                      onClick={() => setServiceId(service.id)}
+                      onClick={() => selectFreightFamily(family)}
                       className={cn(
-                        "rounded-xl border p-3 text-left hover:border-brand",
-                        serviceId === service.id
+                        "rounded-xl border p-3 text-left transition-colors hover:border-brand",
+                        freightFamily === family
                           ? "border-brand bg-brand/5"
                           : "border-navy/10 bg-surface",
                       )}
                     >
-                      <p className="text-xs font-bold tracking-widest text-brand uppercase">
-                        {service.family}
+                      <p className="font-semibold text-navy">{family}</p>
+                      <p className="mt-1 text-xs text-navy/50">
+                        {family === "Air Freight"
+                          ? "Air Normal, Air Express, Batteries & Electronics, Phones"
+                          : "LCL and FCL ocean shipping"}
                       </p>
-                      <p className="mt-1 font-semibold text-navy">{service.name}</p>
-                      <p className="mt-1 text-xs text-navy/50">{service.timeline}</p>
-                      <p className="mt-2 text-sm font-bold text-navy">{service.estimate}</p>
-                      <p className="mt-1 text-[11px] text-navy/45">{service.note}</p>
                     </button>
                   ))}
+                </div>
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-xs font-semibold text-navy/70">
+                    Select {freightFamily} service
+                  </span>
+                  <select
+                    value={serviceId}
+                    onChange={(event) => setServiceId(event.target.value)}
+                    className="w-full rounded-xl border border-navy/10 bg-white px-3 py-3 text-sm font-semibold text-navy focus:border-brand focus:outline-none"
+                  >
+                    {familyServices.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name} - {service.estimate}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-3 rounded-xl border border-brand/10 bg-brand/5 p-3">
+                  <p className="text-sm font-bold text-navy">{selectedService.name}</p>
+                  <p className="mt-1 text-xs text-navy/50">{selectedService.timeline}</p>
+                  <p className="mt-1 text-xs text-navy/45">{selectedService.note}</p>
                 </div>
                 <p className="mt-3 rounded-xl bg-accent-orange/10 p-3 text-xs leading-relaxed text-navy/65">
                   Estimates are guidance only. Final charges can change after goods arrive in Ghana
@@ -811,13 +857,13 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field
-                  label="Pieces"
+                  label={selectedService.unit === "unit" ? "Phone units" : "Pieces"}
                   value={pieces}
                   onChange={setPieces}
                   type="number"
                   placeholder="3"
                 />
-                {selectedService.mode === "Air" ? (
+                {selectedService.unit === "kg" ? (
                   <Field
                     label="Weight (kg)"
                     value={weightKg}
@@ -825,7 +871,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                     type="number"
                     placeholder="42.5"
                   />
-                ) : (
+                ) : selectedService.unit === "cbm" ? (
                   <Field
                     label="CBM"
                     value={cbm}
@@ -833,7 +879,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                     type="number"
                     placeholder="0.18"
                   />
-                )}
+                ) : null}
               </div>
               <div className="rounded-xl border border-brand/10 bg-brand/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-widest text-brand">
@@ -843,10 +889,10 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                   ${estimatedPrice.toLocaleString()}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-navy/55">
-                  Calculated from {selectedService.estimate}. Air packages use KG, Ocean LCL uses
-                  CBM, and Ocean FCL uses a flat container estimate. Final invoice may change after
-                  Ghana arrival when actual measurements, customs, duties, and local handling are
-                  confirmed.
+                  Calculated from {selectedService.estimate}. Phones are charged per unit, other air
+                  freight uses KG, Ocean LCL uses CBM, and Ocean FCL uses a flat container estimate.
+                  Final invoice may change after Ghana arrival when actual measurements, customs,
+                  duties, and local handling are confirmed.
                 </p>
               </div>
             </div>
@@ -873,10 +919,10 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
               </div>
               <div className="rounded-xl border border-navy/5 bg-surface p-4">
                 <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-navy/50">
-                  <MapPin className="h-3.5 w-3.5" /> VoltCargo China warehouse address -Copy Address
+                  <MapPin className="h-3.5 w-3.5" /> {freightFamily} China warehouse address
                 </div>
                 <div className="space-y-1 text-sm font-semibold text-navy">
-                  {chinaWarehouseAddress.map((line) => (
+                  {selectedWarehouseAddress.map((line) => (
                     <p key={line}>{line}</p>
                   ))}
                 </div>

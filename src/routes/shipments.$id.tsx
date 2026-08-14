@@ -131,6 +131,30 @@ function ShipmentDetail() {
             </ol>
           </div>
 
+          {events.length > 0 && (
+            <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold">Operational notes</h2>
+              <div className="space-y-3">
+                {[...events].reverse().map((event) => (
+                  <div
+                    key={`${event.status}-${event.createdAt}`}
+                    className="rounded-xl bg-surface p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-navy">
+                        {STATUS_LABEL[event.status]}
+                      </p>
+                      <p className="text-xs text-navy/40">
+                        {new Date(event.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-sm text-navy/65">{event.note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-base font-semibold">Messages</h2>
             <div className="space-y-3">

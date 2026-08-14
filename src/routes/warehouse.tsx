@@ -258,25 +258,12 @@ function WarehouseContent() {
             </div>
             <div className="space-y-3">
               {awaitingArrival.slice(0, 5).map((shipment) => (
-                <div
+                <AwaitingArrivalCard
                   key={shipment.code}
-                  className="flex flex-col justify-between gap-3 rounded-2xl bg-surface p-4 sm:flex-row sm:items-center"
-                >
-                  <div>
-                    <p className="font-mono text-sm font-bold text-brand">{shipment.code}</p>
-                    <p className="text-sm font-semibold text-navy">{shipment.client}</p>
-                    <p className="text-xs text-navy/45">
-                      {shipment.description || "No description"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => receiveCode(shipment.code)}
-                    disabled={statusMutation.isPending}
-                    className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:opacity-60"
-                  >
-                    Receive
-                  </button>
-                </div>
+                  shipment={shipment}
+                  loading={statusMutation.isPending}
+                  onReceive={() => receiveCode(shipment.code)}
+                />
               ))}
               {awaitingArrival.length === 0 && (
                 <EmptyState text="No consignments are awaiting arrival." />
@@ -376,6 +363,49 @@ function WarehouseContent() {
         </div>
       </section>
     </PortalShell>
+  );
+}
+
+function AwaitingArrivalCard({
+  shipment,
+  loading,
+  onReceive,
+}: {
+  shipment: Shipment;
+  loading: boolean;
+  onReceive: () => void;
+}) {
+  const description = parseShipmentDescription(shipment.description);
+
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-2xl bg-surface p-4 sm:flex-row sm:items-center">
+      <div>
+        <p className="font-mono text-sm font-bold text-brand">{shipment.code}</p>
+        <p className="text-sm font-semibold text-navy">{shipment.client}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {description.path && (
+            <span className="rounded-full bg-brand/10 px-2 py-1 text-[11px] font-semibold text-brand">
+              {description.path}
+            </span>
+          )}
+          {description.service && (
+            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-navy/50">
+              {description.service}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-navy/45">
+          {description.item || shipment.description || "No description"}
+        </p>
+      </div>
+      <button
+        onClick={onReceive}
+        disabled={loading}
+        className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:opacity-60"
+      >
+        Receive
+      </button>
+    </div>
   );
 }
 

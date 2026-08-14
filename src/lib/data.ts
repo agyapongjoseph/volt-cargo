@@ -67,6 +67,7 @@ export type Client = {
   phone: string;
   joined: string;
   city: string;
+  country: string;
 };
 
 export type Shipment = {
@@ -153,6 +154,7 @@ type ClientRow = {
   email: string;
   phone: string | null;
   city: string | null;
+  country?: string | null;
   created_at: string;
 };
 
@@ -252,6 +254,24 @@ function dateOnly(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "";
 }
 
+function addDays(value: string, days: number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function estimateShipmentEta(row: Pick<ShipmentRow, "created_at" | "description" | "mode">) {
+  const description = row.description ?? "";
+  if (/air express/i.test(description)) return addDays(row.created_at, 5);
+  if (/air normal/i.test(description)) return addDays(row.created_at, 14);
+  if (/battery|special goods|phones?/i.test(description)) return addDays(row.created_at, 14);
+  if (/ocean freight|\bLCL\b|\bFCL\b/i.test(description) || row.mode === "Sea") {
+    return addDays(row.created_at, 45);
+  }
+  return addDays(row.created_at, row.mode === "Air" ? 14 : 45);
+}
+
 function mapClient(row: ClientRow): Client {
   return {
     clientId: row.client_code,
@@ -260,6 +280,7 @@ function mapClient(row: ClientRow): Client {
     phone: row.phone ?? "",
     joined: dateOnly(row.created_at),
     city: row.city ?? "",
+    country: row.country ?? "",
   };
 }
 
@@ -284,7 +305,7 @@ function mapShipment(row: ShipmentRow): Shipment {
     paid: Boolean(invoice?.paid),
     status: row.status,
     createdAt: dateOnly(row.created_at),
-    eta: dateOnly(row.eta),
+    eta: dateOnly(row.eta) || estimateShipmentEta(row),
     description: row.description ?? "",
   };
 }
@@ -317,7 +338,7 @@ const shipmentSelect = `
   status,
   eta,
   created_at,
-  clients!inner(client_code, full_name, email, phone, city, created_at),
+  clients!inner(client_code, full_name, email, phone, city, country, created_at),
   invoices(invoice_code, amount_cents, paid, created_at)
 `;
 
@@ -329,7 +350,7 @@ export async function getCurrentClient(): Promise<Client | null> {
 
   const { data, error } = await db
     .from("clients")
-    .select("client_code, full_name, email, phone, city, created_at")
+    .select("client_code, full_name, email, phone, city, country, created_at")
     .eq("user_id", auth.user.id)
     .maybeSingle();
   if (error) throw error;
@@ -346,7 +367,7 @@ export async function getSessionProfile(): Promise<SessionProfile> {
     await Promise.all([
       db
         .from("clients")
-        .select("client_code, full_name, email, phone, city, created_at")
+        .select("client_code, full_name, email, phone, city, country, created_at")
         .eq("user_id", auth.user.id)
         .maybeSingle(),
       db.from("user_roles").select("role").eq("user_id", auth.user.id),
@@ -366,7 +387,7 @@ export async function getClients(): Promise<Client[]> {
   const db = requireSupabase();
   const { data, error } = await db
     .from("clients")
-    .select("client_code, full_name, email, phone, city, created_at")
+    .select("client_code, full_name, email, phone, city, country, created_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return ((data ?? []) as ClientRow[]).map(mapClient);
@@ -377,7 +398,9 @@ export async function findClient(idOrEmail: string): Promise<Client | undefined>
   if (!q) return undefined;
 
   const db = requireSupabase();
-  const query = db.from("clients").select("client_code, full_name, email, phone, city, created_at");
+  const query = db
+    .from("clients")
+    .select("client_code, full_name, email, phone, city, country, created_at");
   const { data, error } = isClientId(q)
     ? await query.eq("client_code", q.toUpperCase()).maybeSingle()
     : await query.eq("email", q.toLowerCase()).maybeSingle();
@@ -536,7 +559,7 @@ export async function getInvoices(): Promise<Invoice[]> {
   const { data, error } = await db
     .from("invoices")
     .select(
-      "invoice_code, amount_cents, paid, created_at, shipments(code, clients(client_code, full_name, email, phone, city, created_at))",
+      "invoice_code, amount_cents, paid, created_at, shipments(code, clients(client_code, full_name, email, phone, city, country, created_at))",
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -574,7 +597,7 @@ export async function getTeamUsers(): Promise<TeamUser[]> {
   const { data: clientsData, error: clientsError } = userIds.length
     ? await db
         .from("clients")
-        .select("user_id, client_code, full_name, email, phone, city, created_at")
+        .select("user_id, client_code, full_name, email, phone, city, country, created_at")
         .in("user_id", userIds)
     : { data: [], error: null };
   if (clientsError) throw clientsError;
@@ -645,7 +668,7 @@ export async function getPortalNotifications(
       status,
       note,
       created_at,
-      shipments!inner(code, clients!inner(client_code, full_name, email, phone, city, created_at))
+      shipments!inner(code, clients!inner(client_code, full_name, email, phone, city, country, created_at))
     `,
     )
     .in("status", statuses)
@@ -838,7 +861,7 @@ export async function globalSearch(query: string): Promise<SearchResult> {
   const db = requireSupabase();
   const { data, error } = await db
     .from("clients")
-    .select("client_code, full_name, email, phone, city, created_at")
+    .select("client_code, full_name, email, phone, city, country, created_at")
     .or(`email.eq.${q.toLowerCase()},full_name.ilike.%${q}%`)
     .limit(1)
     .maybeSingle();

@@ -26,6 +26,7 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">(search.mode ?? "signin");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [country, setCountry] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,7 +48,9 @@ function AuthPage() {
         ? supabase.auth.signUp({
             email: email.trim(),
             password,
-            options: { data: { full_name: fullName.trim(), phone: phone.trim() } },
+            options: {
+              data: { full_name: fullName.trim(), phone: phone.trim(), country: country.trim() },
+            },
           })
         : supabase.auth.signInWithPassword({ email: email.trim(), password })
     ).catch((error: unknown) => ({
@@ -112,6 +115,13 @@ function AuthPage() {
             {mode === "signup" && (
               <>
                 <Field label="Full name" value={fullName} onChange={setFullName} required />
+                <Field
+                  label="Country"
+                  value={country}
+                  onChange={setCountry}
+                  placeholder="Ghana"
+                  required
+                />
                 <Field
                   label="Phone"
                   value={phone}
