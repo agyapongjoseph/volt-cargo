@@ -750,10 +750,12 @@ export async function createShipmentForCurrentClient(input: {
 
 export async function updateShipmentStatus(code: string, status: ShipmentStatus, note?: string) {
   const db = requireSupabase();
+  const shipmentCode = code.trim().toUpperCase();
+  const updateNote = note ?? STATUS_LABEL[status];
   const { data, error } = await db
     .from("shipments")
     .update({ status })
-    .eq("code", code.trim().toUpperCase())
+    .eq("code", shipmentCode)
     .select("id")
     .maybeSingle();
   if (error) throw error;
@@ -763,10 +765,16 @@ export async function updateShipmentStatus(code: string, status: ShipmentStatus,
   const { error: eventError } = await db.from("shipment_events").insert({
     shipment_id: data.id,
     status,
-    note: note ?? STATUS_LABEL[status],
+    note: updateNote,
     actor_id: auth.user?.id,
   });
   if (eventError) throw eventError;
+
+  void db.functions
+    .invoke("shipment-status-email", {
+      body: { shipment_code: shipmentCode, status, note: updateNote },
+    })
+    .catch((error) => console.warn("Shipment email notification failed", error));
 }
 
 export async function uploadShipmentPhoto(code: string, file: File): Promise<ShipmentUpload> {

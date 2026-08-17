@@ -66,7 +66,7 @@ function AuthPage() {
     }
 
     if (mode === "signup") {
-      setMessage("Account created. Check your email if confirmation is enabled, then sign in.");
+      setMessage("Account created. Sign in now.");
       setMode("signin");
       return;
     }
