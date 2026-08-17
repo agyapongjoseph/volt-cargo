@@ -49,6 +49,7 @@ function AuthPage() {
             email: email.trim(),
             password,
             options: {
+              emailRedirectTo: getAuthRedirectUrl(),
               data: { full_name: fullName.trim(), phone: phone.trim(), country: country.trim() },
             },
           })
@@ -173,6 +174,10 @@ function AuthPage() {
       <SiteFooter />
     </div>
   );
+}
+
+function getAuthRedirectUrl() {
+  return `${window.location.origin}/auth?mode=signin`;
 }
 
 function getAuthErrorMessage(error: unknown) {
