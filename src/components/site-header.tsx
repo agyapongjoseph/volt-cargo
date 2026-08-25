@@ -7,7 +7,7 @@ const links = [
   { to: "/sourcing", label: "Sourcing" },
   { to: "/track", label: "Tracking" },
   { to: "/#pricing", label: "Pricing" },
-  { to: "/#contact", label: "Network" },
+  { to: "/#contact", label: "Contact Us" },
 ];
 
 export function SiteHeader() {
@@ -40,7 +40,7 @@ export function SiteHeader() {
             to="/auth"
             className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition-all hover:bg-brand/90"
           >
-            Sign in now
+            Login in now
           </Link>
         </div>
         <button

@@ -141,7 +141,7 @@ export function PortalShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r border-navy/5 bg-white transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 w-64 transform border-r border-navy/5 bg-white transition-transform lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -233,7 +233,7 @@ export function PortalShell({
       )}
 
       {/* Main */}
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen flex-1 flex-col lg:ml-64">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-navy/5 bg-white/80 px-6 backdrop-blur">
           <button className="lg:hidden text-navy" onClick={() => setOpen(true)} aria-label="Menu">
             <Menu className="h-5 w-5" />

@@ -18,13 +18,15 @@ export function SiteFooter() {
                 WhatsApp:{" "}
                 <a
                   className="transition-colors hover:text-white"
-                  href="https://wa.me/233240000000"
+                  href="https://wa.me/8119575138492"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  +233 24 000 0000
+                  +81 195 7513 8492
                 </a>
               </p>
+              <p>China Call line: +81 195 7513 8492</p>
+              <p>Ghana Call line: +233 55 169 0356</p>
               <p>
                 Email:{" "}
                 <a className="transition-colors hover:text-white" href="mailto:voltcargo@gmail.com">
@@ -56,7 +58,7 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-col items-center justify-between gap-4 pt-8 text-xs font-medium text-white/40 md:flex-row">
           <p>© {new Date().getFullYear()} VoltCargo Logistics Group. All rights reserved.</p>
-          <p>Payments secured by Paystack</p>
+          <p>Payments secured by Hubtel</p>
         </div>
       </div>
     </footer>

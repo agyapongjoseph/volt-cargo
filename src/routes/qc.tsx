@@ -344,7 +344,7 @@ function QCContent() {
                   disabled={statusMutation.isPending}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-accent-green px-4 py-3 text-sm font-semibold text-white hover:bg-accent-green/90 disabled:opacity-60"
                 >
-                  <Check className="h-4 w-4" /> Approve for consolidation
+                  <Check className="h-4 w-4" /> Approve
                 </button>
               </div>
             </aside>

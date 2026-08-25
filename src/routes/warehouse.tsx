@@ -314,6 +314,10 @@ function WarehouseContent() {
               Only LCL shipments appear here for container grouping. Air and FCL go straight to
               freight release after QC.
             </p>
+            <p className="mt-2 text-xs text-navy/45">
+              Clicking "Mark consolidated" records that the LCL consignment has been physically
+              grouped for ocean freight, then moves it to International Freight Release.
+            </p>
           </div>
           <div className="rounded-full bg-brand/10 px-4 py-2 text-sm font-semibold text-brand">
             {readyToConsolidate.length} ready
@@ -326,6 +330,7 @@ function WarehouseContent() {
               key={s.code}
               shipment={s}
               loading={statusMutation.isPending}
+              actionLabel="Mark consolidated"
               onConsolidate={() => consolidateShipment(s)}
             />
           ))}

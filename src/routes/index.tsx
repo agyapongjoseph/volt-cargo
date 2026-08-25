@@ -634,14 +634,14 @@ function Contact() {
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto mb-12 max-w-2xl text-center">
           <h2 className="mb-4 text-4xl font-bold tracking-tight">Get in Touch</h2>
-          <p className="text-navy/50">Our logistics team is available around the clock.</p>
+          <p className="text-navy/50">Our team is available around the clock.</p>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           <ContactCard
             icon={MessageCircle}
             label="WhatsApp"
-            value="+233 24 000 0000"
-            href="https://wa.me/233240000000"
+            value="+81 195 7513 8492"
+            href="https://wa.me/8119575138492"
           />
           <ContactCard
             icon={Mail}
@@ -649,7 +649,8 @@ function Contact() {
             value="voltcargo@gmail.com"
             href="mailto:voltcargo@gmail.com"
           />
-          <ContactCard icon={Phone} label="Phone" value="+233 30 200 0000" />
+          <ContactCard icon={Phone} label="China Call line" value="+81 195 7513 8492" />
+          <ContactCard icon={Phone} label="Ghana Call line" value="+233 55 169 0356" />
         </div>
         <div className="mt-10 flex items-center justify-center gap-2 text-sm text-navy/50">
           <MapPin className="h-4 w-4" /> Head Office, East Legon, Ghana

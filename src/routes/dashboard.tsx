@@ -11,7 +11,7 @@ import {
   type Client,
   type Shipment,
 } from "@/lib/data";
-import { Plus, Search, Download, X, CheckCircle2, MapPin } from "lucide-react";
+import { Plus, Search, Download, X, CheckCircle2, MapPin, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const warehouseAddresses = {
@@ -700,6 +700,7 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
   const [weightKg, setWeightKg] = useState("");
   const [cbm, setCbm] = useState("");
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const familyServices = shippingServices.filter((service) => service.family === freightFamily);
   const selectedService =
     shippingServices.find((service) => service.id === serviceId) ?? shippingServices[0];
@@ -739,6 +740,29 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
       return;
     }
     await createShipment.mutateAsync();
+  };
+
+  const copyShipmentHandoff = async () => {
+    if (!createdCode) return;
+    const details = [
+      "VoltCargo shipment handoff details",
+      "",
+      `Client ID: ${client.clientId}`,
+      `Consignment code: ${createdCode}`,
+      `Selected package: ${selectedService.family} - ${selectedService.name}`,
+      `Rate: ${selectedService.estimate}`,
+      "",
+      `${freightFamily} China warehouse address:`,
+      ...selectedWarehouseAddress,
+      "",
+      path === "own-supplier"
+        ? "Give the consignment code and warehouse address to your supplier or sourcer. They must present both when delivering your goods."
+        : "VoltCargo will use this code internally while sourcing, receiving, and shipping your goods.",
+    ].join("\n");
+
+    await navigator.clipboard.writeText(details);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -945,6 +969,14 @@ function NewShipmentModal({ client, onClose }: { client: Client; onClose: () => 
                   {path === "own-supplier"
                     ? "Send the consignment code and warehouse address to your supplier. They must present both when delivering your goods."
                     : "Our sourcing team can now handle purchase, receiving, and shipping under this consignment code."}
+                  <button
+                    type="button"
+                    onClick={copyShipmentHandoff}
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand/90"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied" : "Copy client ID, code and address"}
+                  </button>
                 </div>
               )}
               {createShipment.error && (

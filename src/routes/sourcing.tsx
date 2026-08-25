@@ -23,7 +23,7 @@ import showcase2 from "@/assets/showcase-warehouse-2.jpg";
 import showcase3 from "@/assets/showcase-warehouse-3.jpg";
 import showcase4 from "@/assets/showcase-warehouse-4.jpg";
 
-const whatsappHref = "https://wa.me/233240000000";
+const whatsappHref = "https://wa.me/8119575138492";
 
 const categories = [
   {

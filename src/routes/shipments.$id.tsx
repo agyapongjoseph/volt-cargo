@@ -47,7 +47,10 @@ function ShipmentDetail() {
     mutationFn: () => sendShipmentMessage(id, message),
     onSuccess: async () => {
       setMessage("");
-      await queryClient.invalidateQueries({ queryKey: ["shipment-messages", id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["shipment-messages", id] }),
+        queryClient.invalidateQueries({ queryKey: ["portal-notifications"] }),
+      ]);
     },
   });
 

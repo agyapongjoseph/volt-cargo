@@ -219,6 +219,16 @@ type MessageRow = {
   author_label?: string | null;
   body: string;
   created_at: string;
+  shipments?:
+    | {
+        code: string;
+        clients: ClientRow | ClientRow[] | null;
+      }
+    | {
+        code: string;
+        clients: ClientRow | ClientRow[] | null;
+      }[]
+    | null;
 };
 
 type TeamUserRow = {
@@ -692,9 +702,45 @@ export async function getPortalNotifications(
     };
   });
 
-  return [...invoiceItems, ...eventItems]
+  const { data: messageData, error: messageError } = await db
+    .from("messages")
+    .select(
+      `
+      id,
+      author_id,
+      body,
+      created_at,
+      shipments!inner(code, clients!inner(client_code, full_name, email, phone, city, country, created_at))
+    `,
+    )
+    .neq("author_id", profile.user.id)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (messageError) throw messageError;
+
+  const messageItems = ((messageData ?? []) as unknown as MessageRow[]).map((message) => {
+    const shipment = first(message.shipments);
+    const client = first(shipment?.clients);
+    return {
+      id: `message-${message.id}`,
+      title: "New shipment message",
+      body: `${shipment?.code ?? "Shipment"}${client?.full_name ? ` for ${client.full_name}` : ""}: ${truncate(message.body, 90)}`,
+      to: shipment?.code
+        ? `/shipments/${shipment.code}`
+        : role === "client"
+          ? "/dashboard"
+          : `/${role}`,
+      createdAt: message.created_at,
+    };
+  });
+
+  return [...invoiceItems, ...eventItems, ...messageItems]
     .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
     .slice(0, 8);
+}
+
+function truncate(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max - 1)}...` : value;
 }
 
 export async function createShipmentForCurrentClient(input: {
