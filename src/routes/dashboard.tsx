@@ -134,11 +134,15 @@ function DashboardPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ["client-dashboard"],
     queryFn: getClientDashboardData,
   });
-  const paymentMutation = useMutation({ mutationFn: initiateInvoicePayment });
+  const paymentMutation = useMutation({
+    mutationFn: initiateInvoicePayment,
+    onSettled: () => setPayingInvoiceId(null),
+  });
   const currentClient = data?.currentClient ?? null;
   const clientShipments = data?.shipments ?? [];
   const clientInvoices = data?.invoices ?? [];
@@ -396,7 +400,9 @@ function DashboardPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">Invoices</h2>
-            <p className="text-xs text-navy/50">Pay securely with Hubtel</p>
+            <p className="text-xs text-navy/50">
+              Pay securely with Hubtel via mobile money, card, wallet, GhQR, cash or cheque
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -421,11 +427,16 @@ function DashboardPage() {
               </p>
               {!inv.paid && (
                 <button
-                  onClick={() => paymentMutation.mutate(inv.id)}
+                  onClick={() => {
+                    setPayingInvoiceId(inv.id);
+                    paymentMutation.mutate(inv.id);
+                  }}
                   disabled={paymentMutation.isPending}
                   className="mt-3 w-full rounded-full bg-brand py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {paymentMutation.isPending ? "Opening Hubtel..." : "Pay with Hubtel"}
+                  {paymentMutation.isPending && payingInvoiceId === inv.id
+                    ? "Opening Hubtel..."
+                    : "Pay with Hubtel"}
                 </button>
               )}
             </div>
