@@ -241,8 +241,8 @@ function ShipmentDetail() {
                 {!shipment.invoiceId
                   ? "Invoice not issued"
                   : paymentMutation.isPending
-                    ? "Opening Paystack..."
-                    : "Pay with Paystack"}
+                    ? "Opening Hubtel..."
+                    : "Pay with Hubtel"}
               </button>
             )}
           </div>

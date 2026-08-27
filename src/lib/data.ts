@@ -868,12 +868,12 @@ export async function upsertInvoiceForShipment(code: string, amount: number) {
 
 export async function initiateInvoicePayment(invoiceCode: string) {
   const db = requireSupabase();
-  const { data, error } = await db.functions.invoke("paystack-init", {
+  const { data, error } = await db.functions.invoke("hubtel-init", {
     body: { invoice_code: invoiceCode },
   });
   if (error) throw error;
-  if (!data?.authorization_url) throw new Error("Paystack authorization URL was not returned.");
-  window.location.href = data.authorization_url;
+  if (!data?.checkout_url) throw new Error("Hubtel checkout URL was not returned.");
+  window.location.href = data.checkout_url;
 }
 
 export async function getAdminData() {

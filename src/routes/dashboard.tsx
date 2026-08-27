@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { jsPDF } from "jspdf";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PortalShell, StatCard } from "@/components/portal-shell";
 import {
@@ -13,6 +14,9 @@ import {
 } from "@/lib/data";
 import { Plus, Search, Download, X, CheckCircle2, MapPin, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const voltCargoLogo =
+  "https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He";
 
 const warehouseAddresses = {
   "Air Freight": [
@@ -285,7 +289,7 @@ function DashboardPage() {
                     <button
                       key={format}
                       onClick={() => {
-                        exportShipments(filtered, format);
+                        void exportShipments(filtered, format);
                         setExportOpen(false);
                       }}
                       className="block w-full px-4 py-2 text-left text-xs font-semibold text-navy/70 hover:bg-surface"
@@ -392,7 +396,7 @@ function DashboardPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">Invoices</h2>
-            <p className="text-xs text-navy/50">Pay securely with Paystack</p>
+            <p className="text-xs text-navy/50">Pay securely with Hubtel</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -421,7 +425,7 @@ function DashboardPage() {
                   disabled={paymentMutation.isPending}
                   className="mt-3 w-full rounded-full bg-brand py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {paymentMutation.isPending ? "Opening Paystack..." : "Pay with Paystack"}
+                  {paymentMutation.isPending ? "Opening Hubtel..." : "Pay with Hubtel"}
                 </button>
               )}
             </div>
@@ -442,7 +446,7 @@ function PanelMessage({ children }: { children: ReactNode }) {
   );
 }
 
-function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf") {
+async function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf") {
   const rows = shipments.map((shipment) => ({
     Code: shipment.code,
     Description: shipment.description,
@@ -474,13 +478,21 @@ function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf")
     return;
   }
 
-  downloadFile("voltcargo-shipments.pdf", toPdfDocument(rows), "application/pdf");
+  await downloadPdfDocument(rows);
 }
 
 function parseShipmentDescription(value: string) {
   const match = value.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/);
   if (!match) return { path: "", service: "", item: value };
   return { path: match[1], service: match[2], item: match[3] };
+}
+
+function formatPdfDescription(value: string | number | undefined) {
+  const parsed = parseShipmentDescription(String(value ?? ""));
+  if (!parsed.path && !parsed.service) return parsed.item || "Shipment";
+
+  const source = parsed.path === "I already have a supplier" ? "Own supplier" : parsed.path;
+  return [parsed.item || "Shipment", parsed.service, source].filter(Boolean).join("\n");
 }
 
 function ShipmentDescription({ value }: { value: string }) {
@@ -550,107 +562,322 @@ function toExcelDocument(rows: Record<string, string | number>[]) {
   `;
 }
 
-function toPdfDocument(rows: Record<string, string | number>[]) {
-  const lines = [
-    "VoltCargo Shipments",
-    `Generated ${new Date().toLocaleString()}`,
-    "",
-    ...(rows.length
-      ? rows.map(
-          (row) =>
-            `${row.Code} | ${row.Mode} | ${row.Route} | ${row.Weight} | ${row.Status} | ${row.Invoice}`,
-        )
-      : ["No shipments"]),
-  ];
-  const pages: string[][] = [];
-  for (let index = 0; index < lines.length; index += 36) pages.push(lines.slice(index, index + 36));
+type LoadedLogo = { dataUrl: string; width: number; height: number };
 
-  const objects: string[] = [];
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  const pageObjectIds = pages.map((_, index) => 3 + index * 2);
-  objects.push(
-    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pages.length} >>`,
-  );
-
-  pages.forEach((page, index) => {
-    const pageId = 3 + index * 2;
-    const contentId = pageId + 1;
-    const content = [
-      "BT",
-      "/F1 10 Tf",
-      "50 790 Td",
-      ...page.flatMap((line, lineIndex) => [
-        lineIndex === 0 && index === 0
-          ? "/F1 16 Tf"
-          : lineIndex === 1 && index === 0
-            ? "/F1 10 Tf"
-            : "",
-        `(${escapePdfText(String(line).slice(0, 110))}) Tj`,
-        "0 -20 Td",
-      ]),
-      "ET",
-    ]
-      .filter(Boolean)
-      .join("\n");
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 ${objects.length + 3} 0 R >> >> /Contents ${contentId} 0 R >>`,
-    );
-    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+function loadLogoImage(url: string): Promise<LoadedLogo | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0);
+        resolve({
+          dataUrl: canvas.toDataURL("image/png"),
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
   });
+}
 
-  const fontObjectId = objects.length + 1;
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-  for (let index = 0; index < pages.length; index++) {
-    const pageObjectIndex = 2 + index * 2;
-    objects[pageObjectIndex] = objects[pageObjectIndex].replace(
-      /\/F1 \d+ 0 R/,
-      `/F1 ${fontObjectId} 0 R`,
+type JsPDFWithGState = jsPDF & {
+  GState: new (params: { opacity?: number }) => unknown;
+};
+
+function setPdfOpacity(doc: jsPDF, opacity: number) {
+  doc.setGState(new (doc as JsPDFWithGState).GState({ opacity }));
+}
+
+async function downloadPdfDocument(rows: Record<string, string | number>[]) {
+  const totalInvoices = rows.reduce((sum, row) => {
+    const amount = Number(String(row.Invoice ?? "").replace(/[^0-9.]/g, ""));
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const pdfRows = rows.map((row) => ({
+    ...row,
+    Description: formatPdfDescription(row.Description),
+  }));
+  const logo = await loadLogoImage(voltCargoLogo);
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 24;
+  const contentWidth = pageWidth - margin * 2;
+  const navy = [15, 23, 42] as const;
+  const blue = [37, 99, 235] as const;
+  const surface = [248, 250, 252] as const;
+  const border = [226, 232, 240] as const;
+  const slate = [100, 116, 139] as const;
+  const green = [16, 185, 129] as const;
+  const amber = [217, 119, 6] as const;
+  const headers = [
+    "Code",
+    "Description",
+    "Route",
+    "Mode",
+    "Pieces",
+    "Weight",
+    "ETA",
+    "Status",
+    "Invoice",
+    "Payment",
+  ];
+  const widths = [88, 170, 100, 36, 40, 50, 56, 70, 54, 104];
+  let y = margin;
+
+  doc.setFillColor(...surface);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  const addFooter = () => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(116, 132, 155);
+    doc.text("VoltCargo Logistics Group", margin, pageHeight - 18);
+    doc.text(
+      "China to Ghana sourcing, shipping, QC and delivery",
+      pageWidth - margin,
+      pageHeight - 18,
+      {
+        align: "right",
+      },
     );
+  };
+
+  const drawGradientPanel = (x: number, panelY: number, width: number, height: number) => {
+    const radius = 18;
+    const scale = 3;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(width * scale);
+    canvas.height = Math.ceil(height * scale);
+    const ctx = canvas.getContext("2d");
+
+    if (ctx) {
+      const scaledWidth = width * scale;
+      const scaledHeight = height * scale;
+      const scaledRadius = radius * scale;
+      ctx.beginPath();
+      ctx.moveTo(scaledRadius, 0);
+      ctx.lineTo(scaledWidth - scaledRadius, 0);
+      ctx.quadraticCurveTo(scaledWidth, 0, scaledWidth, scaledRadius);
+      ctx.lineTo(scaledWidth, scaledHeight - scaledRadius);
+      ctx.quadraticCurveTo(scaledWidth, scaledHeight, scaledWidth - scaledRadius, scaledHeight);
+      ctx.lineTo(scaledRadius, scaledHeight);
+      ctx.quadraticCurveTo(0, scaledHeight, 0, scaledHeight - scaledRadius);
+      ctx.lineTo(0, scaledRadius);
+      ctx.quadraticCurveTo(0, 0, scaledRadius, 0);
+      ctx.closePath();
+      ctx.clip();
+
+      const gradient = ctx.createLinearGradient(0, 0, scaledWidth, 0);
+      gradient.addColorStop(0, `rgb(${navy.join(",")})`);
+      gradient.addColorStop(1, `rgb(${blue.join(",")})`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+      doc.addImage(canvas.toDataURL("image/png"), "PNG", x, panelY, width, height);
+    } else {
+      doc.setFillColor(...navy);
+      doc.roundedRect(x, panelY, width, height, radius, radius, "F");
+    }
+  };
+
+  const headerHeight = 152;
+  drawGradientPanel(margin, y, contentWidth, headerHeight);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text("V O L T C A R G O   L O G I S T I C S", margin + 16, y + 34);
+  doc.setFontSize(22);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Shipment Export Report", margin + 16, y + 58);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text(`Generated ${new Date().toLocaleString()}`, margin + 16, y + 78);
+
+  const logoBoxWidth = 74;
+  const logoBoxHeight = 24;
+  const logoBoxX = pageWidth - margin - 16 - logoBoxWidth;
+  const logoBoxY = y + 30;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(logoBoxX, logoBoxY, logoBoxWidth, logoBoxHeight, 7, 7, "F");
+  if (logo) {
+    const ratio = logo.width / logo.height;
+    const drawHeight = logoBoxHeight - 8;
+    const drawWidth = Math.min(logoBoxWidth - 12, drawHeight * ratio);
+    doc.addImage(
+      logo.dataUrl,
+      "PNG",
+      logoBoxX + (logoBoxWidth - drawWidth) / 2,
+      logoBoxY + (logoBoxHeight - drawHeight) / 2,
+      drawWidth,
+      drawHeight,
+    );
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...blue);
+    doc.text("voltcargo", logoBoxX + logoBoxWidth / 2, logoBoxY + 15, { align: "center" });
   }
 
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(pdf.length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  const stats = [
+    ["TOTAL SHIPMENTS", pdfRows.length.toString()],
+    ["TOTAL INVOICE VALUE", `$${totalInvoices.toLocaleString()}`],
+    ["EXPORT TYPE", "PDF"],
+  ];
+  stats.forEach(([label, value], index) => {
+    const gap = 7;
+    const statWidth = (contentWidth - 32 - gap * 2) / 3;
+    const x = margin + 16 + index * (statWidth + gap);
+    const statY = y + 92;
+    doc.setFillColor(255, 255, 255);
+    setPdfOpacity(doc, 0.13);
+    doc.roundedRect(x, statY, statWidth, 48, 10, 10, "F");
+    setPdfOpacity(doc, 1);
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(x, statY, statWidth, 48, 10, 10, "S");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(203, 213, 225);
+    doc.text(label, x + 8, statY + 16);
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.text(value, x + 8, statY + 34);
   });
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+
+  y += headerHeight + 22;
+  const tableTop = y;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...border);
+  doc.roundedRect(margin, tableTop, contentWidth, pageHeight - tableTop - 54, 14, 14, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...navy);
+  doc.text("My Shipments", margin + 12, y + 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...slate);
+  doc.text("Track and manage every VoltCargo consignment", pageWidth - margin - 12, y + 18, {
+    align: "right",
   });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return pdf;
-}
+  y += 32;
 
-function escapePdfText(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-}
+  const addTableHeader = () => {
+    let x = margin;
+    doc.setFillColor(...navy);
+    doc.rect(margin, y, contentWidth, 24, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(255, 255, 255);
+    headers.forEach((header, index) => {
+      doc.text(header.toUpperCase(), x + 6, y + 15);
+      x += widths[index];
+    });
+    y += 24;
+  };
 
-function toPrintablePdf(rows: Record<string, string | number>[]) {
-  return `
-    <!doctype html>
-    <html>
-      <head>
-        <title>VoltCargo Shipments</title>
-        <style>
-          body { font-family: Arial, sans-serif; color: #0f172a; padding: 32px; }
-          h1 { margin-bottom: 4px; }
-          p { color: rgba(15, 23, 42, 0.6); }
-          table { border-collapse: collapse; width: 100%; margin-top: 24px; font-size: 12px; }
-          th, td { border: 1px solid rgba(15, 23, 42, 0.12); padding: 8px; text-align: left; }
-          th { background: #f8fafc; }
-        </style>
-      </head>
-      <body>
-        <h1>VoltCargo Shipments</h1>
-        <p>Generated ${new Date().toLocaleString()}</p>
-        ${toExcelTable(rows)}
-      </body>
-    </html>
-  `;
-}
+  addTableHeader();
 
+  if (!pdfRows.length) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...slate);
+    doc.text("No shipments", margin + 12, y + 18);
+  }
+
+  pdfRows.forEach((row, rowIndex) => {
+    const cells = headers.map((header) => String((row as Record<string, unknown>)[header] ?? ""));
+    const wrapped = cells.map((cell, index) => doc.splitTextToSize(cell, widths[index] - 10));
+    const descriptionItem = String(row.Description ?? "").split("\n")[0] || "Shipment";
+    const descriptionLines = doc.splitTextToSize(descriptionItem, widths[1] - 12);
+    const rowHeight = Math.max(
+      44,
+      descriptionLines.length * 8 + 28,
+      ...wrapped.map((lines) => lines.length * 8 + 12),
+    );
+
+    if (y + rowHeight > pageHeight - 36) {
+      addFooter();
+      doc.addPage();
+      doc.setFillColor(...surface);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
+      y = margin;
+      addTableHeader();
+    }
+
+    let x = margin;
+    doc.setFillColor(
+      rowIndex % 2 === 0 ? 255 : surface[0],
+      rowIndex % 2 === 0 ? 255 : surface[1],
+      rowIndex % 2 === 0 ? 255 : surface[2],
+    );
+    doc.rect(margin, y, contentWidth, rowHeight, "F");
+    doc.setDrawColor(...border);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
+    wrapped.forEach((lines, index) => {
+      const header = headers[index];
+      const value = String((row as Record<string, unknown>)[header] ?? "");
+      doc.setFont("helvetica", index === 0 ? "bold" : "normal");
+      doc.setFontSize(7);
+
+      if (header === "Description") {
+        const [item, service, source] = value.split("\n");
+        const itemLines = doc.splitTextToSize(item || "Shipment", widths[index] - 12);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.4);
+        doc.setTextColor(...navy);
+        doc.text(itemLines, x + 6, y + 12, { maxWidth: widths[index] - 12 });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...slate);
+        doc.text(service || "General cargo", x + 6, y + 16 + itemLines.length * 8, {
+          maxWidth: widths[index] - 12,
+        });
+        if (source) {
+          doc.text(source, x + 6, y + 26 + itemLines.length * 8, {
+            maxWidth: widths[index] - 12,
+          });
+        }
+      } else if (header === "Status" || header === "Payment") {
+        const isGood = value === "Delivered" || value === "Paid";
+        const color = isGood ? green : value === "Pending" ? amber : blue;
+        doc.setFillColor(color[0], color[1], color[2]);
+        setPdfOpacity(doc, 0.1);
+        doc.roundedRect(x + 5, y + 7, widths[index] - 10, 14, 4, 4, "F");
+        setPdfOpacity(doc, 1);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.3);
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.text(lines, x + 8, y + 17, { maxWidth: widths[index] - 16 });
+      } else {
+        doc.setTextColor(
+          index === 0 ? blue[0] : navy[0],
+          index === 0 ? blue[1] : navy[1],
+          index === 0 ? blue[2] : navy[2],
+        );
+        doc.text(lines, x + 6, y + 12, { maxWidth: widths[index] - 10 });
+      }
+      x += widths[index];
+    });
+    y += rowHeight;
+  });
+
+  addFooter();
+  doc.save("voltcargo-shipments.pdf");
+}
 function downloadFile(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);

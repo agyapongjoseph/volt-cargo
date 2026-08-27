@@ -506,7 +506,7 @@ const testimonials = [
     name: "Fatima Osei",
     role: "Founder, Osei Auto Parts",
     quote:
-      "Consolidation dropped my Ocean Freight bills by 40%. The Paystack invoicing makes payments frictionless.",
+      "Consolidation dropped my Ocean Freight bills by 40%. The Hubtel invoicing makes payments frictionless.",
   },
 ];
 
@@ -559,7 +559,7 @@ const faqs = [
   },
   {
     q: "How are payments processed?",
-    a: "All payments are processed securely via Paystack — card, bank transfer, and mobile money. Goods are released for delivery only after full payment is confirmed.",
+    a: "All payments are processed securely via Hubtel — mobile money, cards, wallets, GhQR, cash, and cheque. Goods are released for delivery only after full payment is confirmed.",
   },
   {
     q: "Do you do door to door delivery?",
