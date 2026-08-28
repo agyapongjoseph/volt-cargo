@@ -105,7 +105,6 @@ Deno.serve(async (req: Request) => {
       cancellationUrl: `${appUrl}/dashboard#invoices`,
       clientReference,
       payeeName: client?.full_name,
-      payeeMobileNumber: normalizeGhanaPhone(client?.phone),
       payeeEmail: client?.email,
     }),
   });
@@ -153,14 +152,6 @@ async function getUsdToGhsRate() {
 function buildClientReference(invoiceCode: string) {
   const cleanInvoiceCode = invoiceCode.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 22);
   return `${cleanInvoiceCode}-${Date.now().toString(36).slice(-8)}`.slice(0, 32);
-}
-
-function normalizeGhanaPhone(value: string | undefined) {
-  if (!value) return undefined;
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("233")) return digits;
-  if (digits.startsWith("0") && digits.length === 10) return `233${digits.slice(1)}`;
-  return digits || undefined;
 }
 
 function roundMoney(value: number) {
