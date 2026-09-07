@@ -32,6 +32,7 @@ const NAV: Record<PortalRole, { title: string; items: NavItem[] }> = {
       { to: "/dashboard#shipments", label: "My Shipments", icon: Package },
       { to: "/dashboard#invoices", label: "Invoices", icon: Receipt },
       { to: "/track", label: "Track", icon: Search },
+      { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
   admin: {

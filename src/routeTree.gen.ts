@@ -16,6 +16,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DeliveryRouteImport } from './routes/delivery'
 import { Route as QcRouteImport } from './routes/qc'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SourcingRouteImport } from './routes/sourcing'
 import { Route as TrackRouteImport } from './routes/track'
 import { Route as WarehouseRouteImport } from './routes/warehouse'
@@ -57,6 +58,11 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SourcingRoute = SourcingRouteImport.update({
   id: '/sourcing',
   path: '/sourcing',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/delivery': typeof DeliveryRoute
   '/qc': typeof QcRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/sourcing': typeof SourcingRoute
   '/track': typeof TrackRoute
   '/warehouse': typeof WarehouseRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/delivery': typeof DeliveryRoute
   '/qc': typeof QcRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/sourcing': typeof SourcingRoute
   '/track': typeof TrackRoute
   '/warehouse': typeof WarehouseRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/delivery': typeof DeliveryRoute
   '/qc': typeof QcRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/sourcing': typeof SourcingRoute
   '/track': typeof TrackRoute
   '/warehouse': typeof WarehouseRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/delivery'
     | '/qc'
     | '/search'
+    | '/settings'
     | '/sourcing'
     | '/track'
     | '/warehouse'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/delivery'
     | '/qc'
     | '/search'
+    | '/settings'
     | '/sourcing'
     | '/track'
     | '/warehouse'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/delivery'
     | '/qc'
     | '/search'
+    | '/settings'
     | '/sourcing'
     | '/track'
     | '/warehouse'
@@ -179,6 +191,7 @@ export interface RootRouteChildren {
   DeliveryRoute: typeof DeliveryRoute
   QcRoute: typeof QcRoute
   SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
   SourcingRoute: typeof SourcingRoute
   TrackRoute: typeof TrackRoute
   WarehouseRoute: typeof WarehouseRoute
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sourcing': {
       id: '/sourcing'
       path: '/sourcing'
@@ -283,6 +303,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeliveryRoute: DeliveryRoute,
   QcRoute: QcRoute,
   SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
   SourcingRoute: SourcingRoute,
   TrackRoute: TrackRoute,
   WarehouseRoute: WarehouseRoute,

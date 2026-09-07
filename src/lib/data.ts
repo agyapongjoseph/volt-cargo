@@ -381,6 +381,34 @@ export async function getCurrentClient(): Promise<Client | null> {
   return data ? mapClient(data as ClientRow) : null;
 }
 
+export async function updateCurrentClientProfile(input: {
+  name: string;
+  email: string;
+  phone: string;
+}) {
+  const db = requireSupabase();
+  const { data: auth, error: authError } = await db.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user) throw new Error("Sign in before updating your profile.");
+
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  const phone = input.phone.trim();
+  if (!name) throw new Error("Name is required.");
+  if (!email) throw new Error("Email is required.");
+
+  if (email !== (auth.user.email ?? "").toLowerCase()) {
+    const { error: emailError } = await db.auth.updateUser({ email });
+    if (emailError) throw emailError;
+  }
+
+  const { error } = await db
+    .from("clients")
+    .update({ full_name: name, email, phone: phone || null })
+    .eq("user_id", auth.user.id);
+  if (error) throw error;
+}
+
 export async function getSessionProfile(): Promise<SessionProfile> {
   const db = requireSupabase();
   const { data: auth, error: authError } = await db.auth.getUser();
