@@ -108,6 +108,13 @@ export type TeamUser = {
   role: string;
 };
 
+export type ExchangeRate = {
+  id: string;
+  rate: number;
+  effectiveDate: string;
+  createdAt: string;
+};
+
 export type ShipmentEvent = {
   status: ShipmentStatus;
   note: string;
@@ -236,6 +243,13 @@ type TeamUserRow = {
   role: AppRole;
   full_name: string | null;
   email: string | null;
+};
+
+type ExchangeRateRow = {
+  id: string;
+  rate: number | string;
+  effective_date: string;
+  created_at: string;
 };
 
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -876,14 +890,51 @@ export async function initiateInvoicePayment(invoiceCode: string) {
   window.location.href = data.checkout_url;
 }
 
+export async function getCurrentUsdGhsRate(): Promise<ExchangeRate | null> {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("exchange_rates")
+    .select("id, rate, effective_date, created_at")
+    .eq("base_currency", "USD")
+    .eq("quote_currency", "GHS")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as ExchangeRateRow;
+  return {
+    id: row.id,
+    rate: Number(row.rate),
+    effectiveDate: row.effective_date,
+    createdAt: row.created_at,
+  };
+}
+
+export async function setUsdGhsRate(rate: number) {
+  const db = requireSupabase();
+  const { error } = await db.rpc("set_usd_ghs_rate", { rate_value: rate });
+  if (error) throw error;
+}
+
+export async function deleteCurrentClientAccount() {
+  const db = requireSupabase();
+  const { data, error } = await db.functions.invoke("delete-account");
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? "Could not delete account.");
+  await db.auth.signOut();
+}
+
 export async function getAdminData() {
-  const [shipments, clients, invoices, teamUsers] = await Promise.all([
+  const [shipments, clients, invoices, teamUsers, exchangeRate] = await Promise.all([
     getShipments(),
     getClients(),
     getInvoices(),
     getTeamUsers(),
+    getCurrentUsdGhsRate(),
   ]);
-  return { shipments, clients, invoices, teamUsers };
+  return { shipments, clients, invoices, teamUsers, exchangeRate };
 }
 
 export async function getClientDetailData(clientId: string) {

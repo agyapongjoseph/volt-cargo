@@ -80,7 +80,10 @@ Deno.serve(async (req: Request) => {
 
   const shipment = Array.isArray(invoice.shipments) ? invoice.shipments[0] : invoice.shipments;
   const client = Array.isArray(shipment?.clients) ? shipment?.clients[0] : shipment?.clients;
-  const exchangeRate = await getUsdToGhsRate();
+  const exchangeRate = await getUsdToGhsRate(adminClient).catch((error) => {
+    return error instanceof Error ? error.message : "Could not load exchange rate";
+  });
+  if (typeof exchangeRate === "string") return json({ error: exchangeRate }, 400);
   const usdAmount = invoice.amount_cents / 100;
   const ghsAmount = roundMoney(usdAmount * exchangeRate);
   const clientReference = buildClientReference(invoice.invoice_code);
@@ -139,13 +142,23 @@ Deno.serve(async (req: Request) => {
   });
 });
 
-async function getUsdToGhsRate() {
-  const response = await fetch("https://open.er-api.com/v6/latest/USD");
-  const payload = await response.json().catch(() => null);
-  const rate = Number(payload?.rates?.GHS);
-  if (!response.ok || !Number.isFinite(rate) || rate <= 0) {
-    throw new Error("Could not fetch USD to GHS exchange rate");
+async function getUsdToGhsRate(adminClient: ReturnType<typeof createClient>) {
+  const { data, error } = await adminClient
+    .from("exchange_rates")
+    .select("rate")
+    .eq("base_currency", "USD")
+    .eq("quote_currency", "GHS")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  const rate = Number(data?.rate);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    throw new Error("VoltCargo USD to GHS rate has not been set by admin.");
   }
+
   return rate;
 }
 

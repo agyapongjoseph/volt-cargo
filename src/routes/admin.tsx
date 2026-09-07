@@ -11,6 +11,7 @@ import {
   clientSpend,
   upsertInvoiceForShipment,
   updateShipmentStatus,
+  setUsdGhsRate,
   type Invoice,
   type Shipment,
   type ShipmentStatus,
@@ -55,6 +56,7 @@ function AdminContent() {
   const [shipmentQuery, setShipmentQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Shipment["status"]>("all");
   const [invoiceDrafts, setInvoiceDrafts] = useState<Record<string, string>>({});
+  const [rateDraft, setRateDraft] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({ queryKey: ["admin-data"], queryFn: getAdminData });
@@ -85,10 +87,23 @@ function AdminContent() {
       setStatusError(err instanceof Error ? err.message : "Could not update shipment status.");
     },
   });
+  const rateMutation = useMutation({
+    mutationFn: (rate: number) => setUsdGhsRate(rate),
+    onSuccess: async (_, rate) => {
+      setStatusError(null);
+      setStatusMessage(`USD to GHS rate updated to GHS ${rate.toFixed(4)}.`);
+      await queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+    },
+    onError: (err) => {
+      setStatusMessage(null);
+      setStatusError(err instanceof Error ? err.message : "Could not update exchange rate.");
+    },
+  });
   const shipments = data?.shipments ?? [];
   const clients = data?.clients ?? [];
   const invoices = data?.invoices ?? [];
   const teamUsers = data?.teamUsers ?? [];
+  const exchangeRate = data?.exchangeRate ?? null;
   const billedRevenue = invoices.reduce((s, i) => s + i.amount, 0);
   const outstanding = invoices.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
   const inFlight = shipments.filter((s) => !["delivered"].includes(s.status)).length;
@@ -146,6 +161,10 @@ function AdminContent() {
     window.addEventListener("hashchange", syncHash);
     return () => window.removeEventListener("hashchange", syncHash);
   }, []);
+
+  useEffect(() => {
+    if (exchangeRate && !rateDraft) setRateDraft(String(exchangeRate.rate));
+  }, [exchangeRate, rateDraft]);
 
   const changeTab = (nextTab: Tab) => {
     setTab(nextTab);
@@ -216,6 +235,43 @@ function AdminContent() {
             />
             <StatCard label="Active shipments" value={inFlight} accent="green" />
             <StatCard label="Delivery rate" value={`${deliveryRate}%`} accent="brand" />
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-brand/10 bg-white p-6 shadow-sm">
+            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+              <div>
+                <p className="text-xs font-bold tracking-widest text-brand uppercase">
+                  VoltCargo exchange rate
+                </p>
+                <h3 className="mt-2 text-xl font-bold text-navy">Weekly USD to Ghana cedis rate</h3>
+                <p className="mt-2 text-sm text-navy/55">
+                  Hubtel checkout converts USD invoices using this internal rate. Current rate:{" "}
+                  <span className="font-semibold text-navy">
+                    {exchangeRate ? `1 USD = GHS ${exchangeRate.rate.toLocaleString()}` : "Not set"}
+                  </span>
+                  {exchangeRate?.effectiveDate ? `, effective ${exchangeRate.effectiveDate}` : ""}.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  value={rateDraft}
+                  onChange={(event) => setRateDraft(event.target.value)}
+                  type="number"
+                  min="0.01"
+                  step="0.0001"
+                  placeholder="e.g. 16.2500"
+                  className="w-full rounded-full border border-navy/10 bg-surface px-4 py-2 text-sm font-semibold text-navy focus:border-brand focus:outline-none sm:w-40"
+                  aria-label="USD to GHS exchange rate"
+                />
+                <button
+                  onClick={() => rateMutation.mutate(Number(rateDraft))}
+                  disabled={rateMutation.isPending || !Number(rateDraft)}
+                  className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {rateMutation.isPending ? "Saving..." : "Save rate"}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
