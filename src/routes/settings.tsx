@@ -38,7 +38,7 @@ function SettingsPage() {
     mutationFn: () => updateCurrentClientProfile({ name, email, phone }),
     onSuccess: async () => {
       setMessage(
-        "Profile updated. If you changed your email, check your inbox to confirm the new address.",
+        "Profile updated successfully. You may need to refresh the page to see the changes reflected in your account.",
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["session-profile"] }),

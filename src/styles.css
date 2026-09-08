@@ -32,11 +32,34 @@
     transform: translateY(0);
   }
 }
+@keyframes marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes slow-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1deg);
+  }
+}
 @utility animate-bounce-subtle {
   animation: bounce-subtle 3s ease-in-out infinite;
 }
 @utility animate-fade-up {
   animation: fade-up 600ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@utility animate-marquee-left {
+  animation: marquee-left 30s linear infinite;
+}
+@utility animate-slow-float {
+  animation: slow-float 5s ease-in-out infinite;
 }
 
 @custom-variant dark (&:is(.dark *));

@@ -143,21 +143,22 @@ function DashboardPreview() {
       <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <span className="mb-5 inline-flex rounded-full bg-brand/10 px-4 py-1.5 text-xs font-bold tracking-widest text-brand uppercase">
-            Sourcing + Shipping
+            Coming to China + Sourcing
           </span>
           <h2 className="mb-6 text-4xl leading-tight font-bold tracking-tight lg:text-5xl">
-            Buy from China with a team that checks, ships, and delivers for you.
+            Visit China or buy from China with a team that guides, checks, ships, and delivers.
           </h2>
           <p className="mb-8 max-w-xl text-lg leading-relaxed text-navy/55">
-            VoltCargo helps importers find reliable suppliers, verify goods before payment or
-            shipment, consolidate packages, and move cargo from China to Ghana with clear tracking.
+            VoltCargo helps importers plan China buying trips, visit suppliers and factories, source
+            goods remotely, verify items, consolidate cargo, and move everything to Ghana with clear
+            tracking.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
-              to="/auth"
+              to="/sourcing"
               className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 transition-colors hover:bg-brand/90"
             >
-              Request Sourcing Help <ArrowRight className="h-4 w-4" />
+              Plan China Support <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               to="/track"
@@ -187,8 +188,8 @@ function DashboardPreview() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <SolutionStep
                   icon={PackageSearch}
-                  title="Source"
-                  desc="Supplier search, price checks, and purchase guidance."
+                  title="Visit or source"
+                  desc="China trip support, supplier search, price checks, and purchase guidance."
                 />
                 <SolutionStep
                   icon={ClipboardCheck}
@@ -566,8 +567,8 @@ const faqs = [
     a: "Yes. we are able to arrange for delivery for you when your things are in Ghana.",
   },
   {
-    q: "Do you do sourcing?",
-    a: "Yes. We are able to support you source goods and get in touch with reliable suppliers from China. Electronics, Building Materials, machines, Cars. Kindly click on the sourcing tap to view our sourcing page",
+    q: "Do you help clients come to China or source from China?",
+    a: "Yes. VoltCargo supports China business trips with visa guidance, flight and hotel booking support, supplier and factory visits, and product sourcing. We can also help source electronics, building materials, machines, auto parts, fashion, furniture, beauty products, packaging, and more. Visit the Coming to China page for details.",
   },
   {
     q: "Do you do consolidation?",
