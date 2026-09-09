@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -15,6 +17,7 @@ import {
 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { createSourcingRequest } from "@/lib/data";
 import heroImg from "@/assets/heroImg.jpg";
 import cityImg from "@/assets/cityImg.jpg";
 import marketImg from "@/assets/marketImg.jpg";
@@ -410,6 +413,24 @@ function ComingToChinaPage() {
         </div>
       </section>
 
+      <section className="px-6 py-24" id="request">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div>
+            <p className="text-xs font-bold tracking-widest text-brand uppercase">
+              Sourcing request
+            </p>
+            <h2 className="mt-3 text-4xl font-black tracking-tight lg:text-5xl">
+              Send the product you want us to find in China.
+            </h2>
+            <p className="mt-5 text-lg leading-relaxed text-navy/55">
+              Add the product name, quantity, target price, link or photo reference, and any details
+              that will help VoltCargo check suppliers properly.
+            </p>
+          </div>
+          <SourcingRequestForm />
+        </div>
+      </section>
+
       <section className="px-6 py-24">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-[2.5rem] bg-brand p-8 text-white shadow-2xl shadow-brand/20 lg:p-14">
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -433,6 +454,12 @@ function ComingToChinaPage() {
                 className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-brand transition-colors hover:bg-white/90"
               >
                 Chat on WhatsApp <ArrowRight className="h-4 w-4" />
+              </a>
+              <a
+                href="#request"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10"
+              >
+                Send sourcing request
               </a>
               <Link
                 to="/auth"
@@ -468,6 +495,119 @@ function ServiceGroupCard({
       <h3 className="relative text-2xl font-black">{title}</h3>
       <p className="relative mt-3 text-sm leading-relaxed text-navy/55">{desc}</p>
     </div>
+  );
+}
+
+function SourcingRequestForm() {
+  const [productName, setProductName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
+  const [productLink, setProductLink] = useState("");
+  const [notes, setNotes] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const requestMutation = useMutation({
+    mutationFn: () =>
+      createSourcingRequest({ productName, quantity, targetPrice, productLink, notes }),
+    onSuccess: () => {
+      setProductName("");
+      setQuantity("");
+      setTargetPrice("");
+      setProductLink("");
+      setNotes("");
+      setMessage("Sourcing request sent. VoltCargo will review it and contact you.");
+    },
+    onError: (err) => {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Could not send sourcing request. Please sign in and try again.",
+      );
+    },
+  });
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage(null);
+    requestMutation.mutate();
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-[2rem] border border-navy/5 bg-white p-6 shadow-xl shadow-navy/5"
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        <FormField label="Product name" value={productName} onChange={setProductName} required />
+        <FormField
+          label="Quantity"
+          value={quantity}
+          onChange={setQuantity}
+          placeholder="e.g. 100 pieces"
+        />
+        <FormField
+          label="Target price"
+          value={targetPrice}
+          onChange={setTargetPrice}
+          placeholder="e.g. $8 per piece"
+        />
+        <FormField
+          label="Product link"
+          value={productLink}
+          onChange={setProductLink}
+          placeholder="Alibaba, 1688, photo link"
+        />
+      </div>
+      <label className="mt-4 block text-sm">
+        <span className="mb-1 block text-xs font-semibold text-navy/70">Notes</span>
+        <textarea
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          rows={4}
+          placeholder="Describe quality, color, size, destination, deadline, or supplier details."
+          className="w-full rounded-xl border border-navy/10 bg-surface px-4 py-3 text-sm focus:border-brand focus:outline-none"
+        />
+      </label>
+      {message && <p className="mt-4 rounded-xl bg-surface p-3 text-sm text-navy/70">{message}</p>}
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={requestMutation.isPending || !productName.trim()}
+          className="rounded-full bg-brand px-6 py-3 text-sm font-bold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {requestMutation.isPending ? "Sending..." : "Send request"}
+        </button>
+        <Link to="/auth" className="text-sm font-semibold text-brand hover:underline">
+          Sign in first if you are not logged in
+        </Link>
+      </div>
+    </form>
+  );
+}
+
+function FormField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="mb-1 block text-xs font-semibold text-navy/70">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-navy/10 bg-surface px-4 py-3 text-sm focus:border-brand focus:outline-none"
+      />
+    </label>
   );
 }
 

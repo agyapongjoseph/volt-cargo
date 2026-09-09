@@ -97,8 +97,34 @@ export type Invoice = {
   clientId: string;
   client: string;
   amount: number;
+  currency: string;
   paid: boolean;
   issued: string;
+  lineItems: InvoiceLineItem[];
+  hubtelAmountGhs: number;
+  hubtelExchangeRate: number;
+  hubtelReference: string;
+  hubtelTransactionId: string;
+  paidAt: string;
+};
+
+export type InvoiceLineItem = {
+  label: string;
+  amount: number;
+};
+
+export type SourcingRequest = {
+  id: string;
+  client: string;
+  email: string;
+  phone: string;
+  productName: string;
+  quantity: string;
+  targetPrice: string;
+  productLink: string;
+  notes: string;
+  status: string;
+  createdAt: string;
 };
 
 export type TeamUser = {
@@ -166,10 +192,44 @@ type ClientRow = {
 };
 
 type InvoiceRow = {
+  id?: string;
   invoice_code: string | null;
   amount_cents: number | null;
+  currency?: string | null;
   paid: boolean | null;
+  paid_at?: string | null;
   created_at: string | null;
+  hubtel_client_reference?: string | null;
+  hubtel_transaction_id?: string | null;
+  hubtel_amount_ghs_cents?: number | null;
+  hubtel_exchange_rate?: number | string | null;
+  invoice_line_items?: InvoiceLineItemRow[] | InvoiceLineItemRow[] | null;
+};
+
+type InvoiceLineItemRow = {
+  label: string;
+  amount_cents: number;
+  sort_order?: number;
+};
+
+type SourcingRequestRow = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  product_name: string;
+  quantity: string | null;
+  target_price: string | null;
+  product_link: string | null;
+  notes: string | null;
+  status: string;
+  created_at: string;
+};
+
+type ShipmentDocumentRow = {
+  filename: string;
+  storage_path: string;
+  created_at: string;
 };
 
 type ShipmentRow = {
@@ -337,6 +397,7 @@ function mapShipment(row: ShipmentRow): Shipment {
 function mapInvoice(row: InvoiceWithShipmentRow): Invoice {
   const shipment = first(row.shipments);
   const client = first(shipment?.clients);
+  const lineItems = (row.invoice_line_items ?? []) as InvoiceLineItemRow[];
 
   return {
     id: row.invoice_code ?? "Invoice",
@@ -344,8 +405,17 @@ function mapInvoice(row: InvoiceWithShipmentRow): Invoice {
     clientId: client?.client_code ?? "",
     client: client?.full_name ?? "Unknown client",
     amount: Number(row.amount_cents ?? 0) / 100,
+    currency: row.currency ?? "USD",
     paid: Boolean(row.paid),
     issued: dateOnly(row.created_at),
+    lineItems: lineItems
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((item) => ({ label: item.label, amount: Number(item.amount_cents ?? 0) / 100 })),
+    hubtelAmountGhs: Number(row.hubtel_amount_ghs_cents ?? 0) / 100,
+    hubtelExchangeRate: Number(row.hubtel_exchange_rate ?? 0),
+    hubtelReference: row.hubtel_client_reference ?? "",
+    hubtelTransactionId: row.hubtel_transaction_id ?? "",
+    paidAt: dateOnly(row.paid_at),
   };
 }
 
@@ -363,7 +433,7 @@ const shipmentSelect = `
   eta,
   created_at,
   clients!inner(client_code, full_name, email, phone, city, country, created_at),
-  invoices(invoice_code, amount_cents, paid, created_at)
+  invoices(invoice_code, amount_cents, currency, paid, created_at)
 `;
 
 export async function getCurrentClient(): Promise<Client | null> {
@@ -611,7 +681,7 @@ export async function getInvoices(): Promise<Invoice[]> {
   const { data, error } = await db
     .from("invoices")
     .select(
-      "invoice_code, amount_cents, paid, created_at, shipments(code, clients(client_code, full_name, email, phone, city, country, created_at))",
+      "id, invoice_code, amount_cents, currency, paid, paid_at, hubtel_client_reference, hubtel_transaction_id, hubtel_amount_ghs_cents, hubtel_exchange_rate, created_at, invoice_line_items(label, amount_cents, sort_order), shipments(code, clients(client_code, full_name, email, phone, city, country, created_at))",
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -908,6 +978,22 @@ export async function upsertInvoiceForShipment(code: string, amount: number) {
   if (error) throw error;
 }
 
+export async function upsertInvoiceQuoteForShipment(
+  code: string,
+  items: { label: string; amount: number }[],
+) {
+  const db = requireSupabase();
+  const quoteItems = items
+    .map((item) => ({ label: item.label.trim(), amount: Number(item.amount || 0) }))
+    .filter((item) => item.label && item.amount !== 0);
+  const { error } = await db.rpc("upsert_invoice_quote_for_shipment", {
+    shipment_code: code.trim().toUpperCase(),
+    quote_items: quoteItems,
+    currency_code: "USD",
+  });
+  if (error) throw error;
+}
+
 export async function initiateInvoicePayment(invoiceCode: string) {
   const db = requireSupabase();
   const { data, error } = await db.functions.invoke("hubtel-init", {
@@ -954,15 +1040,105 @@ export async function deleteCurrentClientAccount() {
   await db.auth.signOut();
 }
 
+export async function getShipmentPhotos(code: string): Promise<ShipmentUpload[]> {
+  const db = requireSupabase();
+  const shipmentId = await getShipmentUuid(code);
+  if (!shipmentId) return [];
+
+  const { data, error } = await db
+    .from("shipment_documents")
+    .select("filename, storage_path, created_at")
+    .eq("shipment_id", shipmentId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = (data ?? []) as ShipmentDocumentRow[];
+  const signed = await Promise.all(
+    rows.map(async (row) => {
+      const { data: signedUrl } = await db.storage
+        .from("shipment-photos")
+        .createSignedUrl(row.storage_path, 60 * 10);
+      return { filename: row.filename, storagePath: row.storage_path, url: signedUrl?.signedUrl };
+    }),
+  );
+  return signed;
+}
+
+export async function createSourcingRequest(input: {
+  productName: string;
+  quantity: string;
+  targetPrice: string;
+  productLink: string;
+  notes: string;
+}) {
+  const db = requireSupabase();
+  const profile = await getSessionProfile();
+  if (!profile.client) throw new Error("Sign in before sending a sourcing request.");
+
+  const { data: clientRow, error: clientError } = await db
+    .from("clients")
+    .select("id")
+    .eq("client_code", profile.client.clientId)
+    .maybeSingle();
+  if (clientError) throw clientError;
+  if (!clientRow) throw new Error("Client profile not found.");
+
+  const { error } = await db.from("sourcing_requests").insert({
+    client_id: clientRow.id,
+    full_name: profile.client.name,
+    email: profile.client.email,
+    phone: profile.client.phone || null,
+    product_name: input.productName.trim(),
+    quantity: input.quantity.trim() || null,
+    target_price: input.targetPrice.trim() || null,
+    product_link: input.productLink.trim() || null,
+    notes: input.notes.trim() || null,
+  });
+  if (error) throw error;
+}
+
+export async function getSourcingRequests(): Promise<SourcingRequest[]> {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("sourcing_requests")
+    .select(
+      "id, full_name, email, phone, product_name, quantity, target_price, product_link, notes, status, created_at",
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  return ((data ?? []) as SourcingRequestRow[]).map((row) => ({
+    id: row.id,
+    client: row.full_name,
+    email: row.email,
+    phone: row.phone ?? "",
+    productName: row.product_name,
+    quantity: row.quantity ?? "",
+    targetPrice: row.target_price ?? "",
+    productLink: row.product_link ?? "",
+    notes: row.notes ?? "",
+    status: row.status,
+    createdAt: dateOnly(row.created_at),
+  }));
+}
+
+export async function updateSourcingRequestStatus(id: string, status: string) {
+  const db = requireSupabase();
+  const { error } = await db.from("sourcing_requests").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function getAdminData() {
-  const [shipments, clients, invoices, teamUsers, exchangeRate] = await Promise.all([
-    getShipments(),
-    getClients(),
-    getInvoices(),
-    getTeamUsers(),
-    getCurrentUsdGhsRate(),
-  ]);
-  return { shipments, clients, invoices, teamUsers, exchangeRate };
+  const [shipments, clients, invoices, teamUsers, exchangeRate, sourcingRequests] =
+    await Promise.all([
+      getShipments(),
+      getClients(),
+      getInvoices(),
+      getTeamUsers(),
+      getCurrentUsdGhsRate(),
+      getSourcingRequests(),
+    ]);
+  return { shipments, clients, invoices, teamUsers, exchangeRate, sourcingRequests };
 }
 
 export async function getClientDetailData(clientId: string) {

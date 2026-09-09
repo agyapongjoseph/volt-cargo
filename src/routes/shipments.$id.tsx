@@ -6,6 +6,7 @@ import {
   findShipment,
   getShipmentEvents,
   getShipmentMessages,
+  getShipmentPhotos,
   initiateInvoicePayment,
   sendShipmentMessage,
   STATUS_LABEL,
@@ -41,6 +42,10 @@ function ShipmentDetail() {
   const { data: messages = [] } = useQuery({
     queryKey: ["shipment-messages", id],
     queryFn: () => getShipmentMessages(id),
+  });
+  const { data: photos = [] } = useQuery({
+    queryKey: ["shipment-photos", id],
+    queryFn: () => getShipmentPhotos(id),
   });
   const paymentMutation = useMutation({ mutationFn: initiateInvoicePayment });
   const messageMutation = useMutation({
@@ -157,6 +162,43 @@ function ShipmentDetail() {
               </div>
             </div>
           )}
+
+          <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold">Shipment photos</h2>
+                <p className="text-xs text-navy/50">
+                  Warehouse, QC, consolidation, and dispatch evidence
+                </p>
+              </div>
+              <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold text-navy/50">
+                {photos.length} photo{photos.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                {photos.map((photo) => (
+                  <a
+                    key={photo.storagePath}
+                    href={photo.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group overflow-hidden rounded-2xl bg-surface"
+                  >
+                    <img
+                      src={photo.url}
+                      alt={photo.filename}
+                      className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl bg-surface p-4 text-sm text-navy/50">
+                No shipment photos have been uploaded yet.
+              </p>
+            )}
+          </div>
 
           <div className="rounded-2xl border border-navy/5 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-base font-semibold">Messages</h2>

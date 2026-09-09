@@ -10,7 +10,9 @@ import {
   statusColor,
   clientSpend,
   upsertInvoiceForShipment,
+  upsertInvoiceQuoteForShipment,
   updateShipmentStatus,
+  updateSourcingRequestStatus,
   setUsdGhsRate,
   type Invoice,
   type Shipment,
@@ -40,7 +42,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "overview" | "shipments" | "clients" | "invoices" | "users";
+type Tab = "overview" | "shipments" | "clients" | "invoices" | "sourcing" | "users";
 
 function AdminPage() {
   return (
@@ -56,6 +58,7 @@ function AdminContent() {
   const [shipmentQuery, setShipmentQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Shipment["status"]>("all");
   const [invoiceDrafts, setInvoiceDrafts] = useState<Record<string, string>>({});
+  const [quoteShipment, setQuoteShipment] = useState<Shipment | null>(null);
   const [rateDraft, setRateDraft] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -103,6 +106,7 @@ function AdminContent() {
   const clients = data?.clients ?? [];
   const invoices = data?.invoices ?? [];
   const teamUsers = data?.teamUsers ?? [];
+  const sourcingRequests = data?.sourcingRequests ?? [];
   const exchangeRate = data?.exchangeRate ?? null;
   const billedRevenue = invoices.reduce((s, i) => s + i.amount, 0);
   const outstanding = invoices.filter((i) => !i.paid).reduce((s, i) => s + i.amount, 0);
@@ -149,11 +153,16 @@ function AdminContent() {
     const matchesStatus = statusFilter === "all" || shipment.status === statusFilter;
     return matchesQuery && matchesStatus;
   });
+  const sourcingStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      updateSourcingRequestStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-data"] }),
+  });
 
   useEffect(() => {
     const syncHash = () => {
       const hash = window.location.hash.replace("#", "") as Tab;
-      if (["overview", "shipments", "clients", "invoices", "users"].includes(hash)) {
+      if (["overview", "shipments", "clients", "invoices", "sourcing", "users"].includes(hash)) {
         setTab(hash);
       }
     };
@@ -192,18 +201,20 @@ function AdminContent() {
   return (
     <PortalShell role="admin" title="Admin Console" subtitle="Operations control tower">
       <div className="mb-6 inline-flex rounded-full border border-navy/10 bg-white p-1 text-sm">
-        {(["overview", "shipments", "clients", "invoices", "users"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => changeTab(t)}
-            className={cn(
-              "rounded-full px-4 py-1.5 font-medium capitalize transition-colors",
-              tab === t ? "bg-brand text-white" : "text-navy/60 hover:text-navy",
-            )}
-          >
-            {t}
-          </button>
-        ))}
+        {(["overview", "shipments", "clients", "invoices", "sourcing", "users"] as Tab[]).map(
+          (t) => (
+            <button
+              key={t}
+              onClick={() => changeTab(t)}
+              className={cn(
+                "rounded-full px-4 py-1.5 font-medium capitalize transition-colors",
+                tab === t ? "bg-brand text-white" : "text-navy/60 hover:text-navy",
+              )}
+            >
+              {t}
+            </button>
+          ),
+        )}
       </div>
 
       {(statusMessage || statusError) && (
@@ -544,6 +555,12 @@ function AdminContent() {
                       >
                         Save
                       </button>
+                      <button
+                        onClick={() => setQuoteShipment(s)}
+                        className="rounded-full border border-navy/10 px-3 py-1 text-xs font-semibold text-navy/70 hover:bg-surface"
+                      >
+                        Quote
+                      </button>
                     </div>
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -629,6 +646,8 @@ function AdminContent() {
                 <th className="px-5 py-3 text-left">Client</th>
                 <th className="px-5 py-3 text-left">Issued</th>
                 <th className="px-5 py-3 text-right">Amount</th>
+                <th className="px-5 py-3 text-right">Hubtel GHS</th>
+                <th className="px-5 py-3 text-left">Payment ref</th>
                 <th className="px-5 py-3 text-center">Status</th>
               </tr>
             </thead>
@@ -639,7 +658,24 @@ function AdminContent() {
                   <td className="px-5 py-3 font-mono text-xs text-brand">{i.code}</td>
                   <td className="px-5 py-3">{i.client}</td>
                   <td className="px-5 py-3 text-navy/70">{i.issued}</td>
-                  <td className="px-5 py-3 text-right font-semibold">${i.amount}</td>
+                  <td className="px-5 py-3 text-right font-semibold">
+                    ${i.amount.toLocaleString()}
+                    {i.lineItems.length > 0 && (
+                      <p className="text-[11px] font-normal text-navy/45">
+                        {i.lineItems.length} quote item{i.lineItems.length === 1 ? "" : "s"}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right text-xs text-navy/70">
+                    {i.hubtelAmountGhs ? `GHS ${i.hubtelAmountGhs.toLocaleString()}` : "Pending"}
+                    {i.hubtelExchangeRate ? (
+                      <p className="text-[11px] text-navy/40">Rate {i.hubtelExchangeRate}</p>
+                    ) : null}
+                  </td>
+                  <td className="px-5 py-3 text-xs text-navy/60">
+                    {i.hubtelTransactionId || i.hubtelReference || "Not started"}
+                    {i.paidAt && <p className="text-[11px] text-navy/40">Paid {i.paidAt}</p>}
+                  </td>
                   <td className="px-5 py-3 text-center">
                     <span
                       className={cn(
@@ -654,6 +690,86 @@ function AdminContent() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "sourcing" && (
+        <div className="rounded-2xl border border-navy/5 bg-white shadow-sm">
+          <div className="border-b border-navy/5 p-5">
+            <h2 className="text-base font-semibold">Sourcing Requests</h2>
+            <p className="mt-1 text-xs text-navy/50">
+              Products clients want VoltCargo to find in China.
+            </p>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-surface text-xs uppercase text-navy/50">
+              <tr>
+                <th className="px-5 py-3 text-left">Client</th>
+                <th className="px-5 py-3 text-left">Product</th>
+                <th className="px-5 py-3 text-left">Quantity / target</th>
+                <th className="px-5 py-3 text-left">Notes</th>
+                <th className="px-5 py-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-navy/5">
+              {sourcingRequests.map((request) => (
+                <tr key={request.id} className="align-top hover:bg-surface/60">
+                  <td className="px-5 py-3">
+                    <p className="font-semibold">{request.client}</p>
+                    <p className="text-xs text-navy/50">{request.email}</p>
+                    {request.phone && <p className="text-xs text-navy/50">{request.phone}</p>}
+                  </td>
+                  <td className="px-5 py-3">
+                    <p className="font-semibold">{request.productName}</p>
+                    {request.productLink && (
+                      <a
+                        href={request.productLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-brand hover:underline"
+                      >
+                        Open link
+                      </a>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-navy/70">
+                    <p>{request.quantity || "-"}</p>
+                    <p className="text-xs text-navy/45">
+                      {request.targetPrice || "No target price"}
+                    </p>
+                  </td>
+                  <td className="max-w-xs px-5 py-3 text-xs leading-relaxed text-navy/60">
+                    {request.notes || "No notes"}
+                    <p className="mt-2 text-[11px] text-navy/35">Sent {request.createdAt}</p>
+                  </td>
+                  <td className="px-5 py-3">
+                    <select
+                      value={request.status}
+                      onChange={(event) =>
+                        sourcingStatusMutation.mutate({
+                          id: request.id,
+                          status: event.target.value,
+                        })
+                      }
+                      className="rounded-full border border-navy/10 bg-white px-3 py-1.5 text-xs font-semibold capitalize text-navy/70 focus:border-brand focus:outline-none"
+                    >
+                      <option value="new">New</option>
+                      <option value="reviewing">Reviewing</option>
+                      <option value="quoted">Quoted</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {sourcingRequests.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-navy/50">
+                    No sourcing requests yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -691,6 +807,18 @@ function AdminContent() {
           </table>
         </div>
       )}
+      {quoteShipment && (
+        <QuoteModal
+          shipment={quoteShipment}
+          onClose={() => setQuoteShipment(null)}
+          onSaved={async () => {
+            setQuoteShipment(null);
+            setStatusError(null);
+            setStatusMessage(`Quote saved for ${quoteShipment.code}.`);
+            await queryClient.invalidateQueries({ queryKey: ["admin-data"] });
+          }}
+        />
+      )}
     </PortalShell>
   );
 }
@@ -699,6 +827,110 @@ function PanelMessage({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-2xl border border-navy/5 bg-white p-8 text-sm text-navy/60 shadow-sm">
       {children}
+    </div>
+  );
+}
+
+function QuoteModal({
+  shipment,
+  onClose,
+  onSaved,
+}: {
+  shipment: Shipment;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [items, setItems] = useState([
+    { label: "Freight", amount: shipment.invoiceTotal ? String(shipment.invoiceTotal) : "" },
+    { label: "Customs / duty", amount: "" },
+    { label: "Local delivery", amount: "" },
+    { label: "Handling", amount: "" },
+    { label: "Discount", amount: "" },
+  ]);
+  const quoteMutation = useMutation({
+    mutationFn: () =>
+      upsertInvoiceQuoteForShipment(
+        shipment.code,
+        items.map((item) => ({ label: item.label, amount: Number(item.amount || 0) })),
+      ),
+    onSuccess: onSaved,
+  });
+  const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-4">
+      <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold tracking-widest text-brand uppercase">
+              Quote breakdown
+            </p>
+            <h3 className="mt-1 text-2xl font-bold text-navy">{shipment.code}</h3>
+            <p className="text-sm text-navy/50">{shipment.client}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full px-3 py-1 text-sm text-navy/50 hover:bg-surface"
+          >
+            Close
+          </button>
+        </div>
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <div key={`${item.label}-${index}`} className="grid grid-cols-[1fr_140px] gap-3">
+              <input
+                value={item.label}
+                onChange={(event) =>
+                  setItems((current) =>
+                    current.map((row, rowIndex) =>
+                      rowIndex === index ? { ...row, label: event.target.value } : row,
+                    ),
+                  )
+                }
+                className="rounded-xl border border-navy/10 bg-surface px-3 py-2 text-sm focus:border-brand focus:outline-none"
+              />
+              <input
+                value={item.amount}
+                onChange={(event) =>
+                  setItems((current) =>
+                    current.map((row, rowIndex) =>
+                      rowIndex === index ? { ...row, amount: event.target.value } : row,
+                    ),
+                  )
+                }
+                type="number"
+                step="0.01"
+                className="rounded-xl border border-navy/10 bg-surface px-3 py-2 text-right text-sm focus:border-brand focus:outline-none"
+                placeholder="0.00"
+              />
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => setItems((current) => [...current, { label: "", amount: "" }])}
+          className="mt-3 rounded-full border border-navy/10 px-4 py-2 text-xs font-semibold text-navy/60 hover:bg-surface"
+        >
+          Add line item
+        </button>
+        <div className="mt-5 flex items-center justify-between rounded-2xl bg-surface p-4">
+          <span className="text-sm font-semibold text-navy/60">Total invoice</span>
+          <span className="text-2xl font-bold text-navy">${total.toLocaleString()}</span>
+        </div>
+        {quoteMutation.error && (
+          <p className="mt-3 rounded-xl bg-accent-red/10 p-3 text-sm text-accent-red">
+            {quoteMutation.error instanceof Error
+              ? quoteMutation.error.message
+              : "Could not save quote."}
+          </p>
+        )}
+        <button
+          onClick={() => quoteMutation.mutate()}
+          disabled={quoteMutation.isPending || total <= 0}
+          className="mt-5 w-full rounded-full bg-brand py-3 text-sm font-semibold text-white hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {quoteMutation.isPending ? "Saving quote..." : "Save quote and update invoice"}
+        </button>
+      </div>
     </div>
   );
 }

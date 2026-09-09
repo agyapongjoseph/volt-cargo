@@ -10,6 +10,7 @@ import {
   STATUS_LABEL,
   statusColor,
   type Client,
+  type Invoice,
   type Shipment,
 } from "@/lib/data";
 import { Plus, Search, Download, X, CheckCircle2, MapPin, Copy } from "lucide-react";
@@ -439,6 +440,12 @@ function DashboardPage() {
                     : "Pay with Hubtel"}
                 </button>
               )}
+              <button
+                onClick={() => downloadInvoiceReceipt(inv)}
+                className="mt-2 w-full rounded-full border border-navy/10 bg-white py-2 text-xs font-semibold text-navy/70 hover:bg-white/70"
+              >
+                Download {inv.paid ? "receipt" : "invoice"} PDF
+              </button>
             </div>
           ))}
         </div>
@@ -455,6 +462,77 @@ function PanelMessage({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+function downloadInvoiceReceipt(invoice: Invoice) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const rows = invoice.lineItems.length
+    ? invoice.lineItems
+    : [{ label: "Shipping invoice", amount: invoice.amount }];
+
+  doc.setFillColor(11, 18, 33);
+  doc.roundedRect(36, 36, pageWidth - 72, 110, 18, 18, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.text(invoice.paid ? "VoltCargo Receipt" : "VoltCargo Invoice", 60, 78);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Invoice: ${invoice.id}`, 60, 105);
+  doc.text(`Shipment: ${invoice.code || "Pending"}`, 60, 122);
+  doc.text(`Issued: ${invoice.issued || "-"}`, pageWidth - 190, 105);
+  doc.text(`Status: ${invoice.paid ? "Paid" : "Due"}`, pageWidth - 190, 122);
+
+  doc.setTextColor(11, 18, 33);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Bill to", 60, 185);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(invoice.client, 60, 205);
+  doc.text(invoice.clientId, 60, 222);
+
+  let y = 275;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(60, y - 24, pageWidth - 120, 34, 10, 10, "F");
+  doc.setFont("helvetica", "bold");
+  doc.text("Description", 78, y - 2);
+  doc.text("Amount", pageWidth - 140, y - 2, { align: "right" });
+  y += 28;
+  rows.forEach((item) => {
+    doc.setFont("helvetica", "normal");
+    doc.text(item.label, 78, y);
+    doc.text(`$${item.amount.toLocaleString()}`, pageWidth - 140, y, { align: "right" });
+    y += 26;
+  });
+
+  doc.setDrawColor(226, 232, 240);
+  doc.line(60, y, pageWidth - 60, y);
+  y += 32;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Total", 78, y);
+  doc.text(`$${invoice.amount.toLocaleString()}`, pageWidth - 140, y, { align: "right" });
+
+  if (invoice.paid) {
+    y += 36;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Paid: ${invoice.paidAt || "Confirmed"}`, 78, y);
+    if (invoice.hubtelTransactionId || invoice.hubtelReference) {
+      doc.text(
+        `Payment reference: ${invoice.hubtelTransactionId || invoice.hubtelReference}`,
+        78,
+        y + 16,
+      );
+    }
+  }
+
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Thank you for shipping with VoltCargo.", 60, 800);
+  doc.save(`${invoice.paid ? "receipt" : "invoice"}-${invoice.id}.pdf`);
 }
 
 async function exportShipments(shipments: Shipment[], format: "csv" | "excel" | "pdf") {
