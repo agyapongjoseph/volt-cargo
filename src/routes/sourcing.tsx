@@ -15,10 +15,10 @@ import {
 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import heroImg from "@/assets/12345.jpg";
-import cityImg from "@/assets/1234.jpg";
-import marketImg from "@/assets/123.jpg";
-import chinaImg from "@/assets/12.jpg";
+import heroImg from "@/assets/heroImg.jpg";
+import cityImg from "@/assets/cityImg.jpg";
+import marketImg from "@/assets/marketImg.jpg";
+import chinaImg from "@/assets/chinaImg.jpg";
 import qcImg from "@/assets/feature-qc.jpg";
 import consImg from "@/assets/feature-consolidation.jpg";
 import catElectronics from "@/assets/category-electronics.jpg";
@@ -33,6 +33,17 @@ import showcase1 from "@/assets/showcase-warehouse-1.jpg";
 import showcase2 from "@/assets/showcase-warehouse-2.jpg";
 import showcase3 from "@/assets/showcase-warehouse-3.jpg";
 import showcase4 from "@/assets/showcase-warehouse-4.jpg";
+import photo4 from "@/assets/photo 4.jpg";
+import photo5 from "@/assets/photo 5.jpg";
+import photo6 from "@/assets/photo 6.jpg";
+import photo7 from "@/assets/photo 7.jpg";
+import photo10 from "@/assets/photo 10.jpg";
+import photo11 from "@/assets/photo 11.jpg";
+import photo12 from "@/assets/photo 12.jpg";
+import photo13 from "@/assets/photo 13.jpg";
+import photo14 from "@/assets/photo 14.jpg";
+import photo15 from "@/assets/photo 15.jpg";
+import photo16 from "@/assets/photo 16.jpg";
 
 const whatsappHref = "https://wa.me/8119575138492";
 
@@ -89,6 +100,24 @@ const tripPlan = [
   "Move purchased goods to VoltCargo for inspection, consolidation, and shipping",
 ];
 
+const serviceGroups = [
+  {
+    icon: Plane,
+    title: "Travel to China",
+    desc: "Visa guidance, flight planning, hotel support, arrival direction, and business-trip preparation.",
+  },
+  {
+    icon: Factory,
+    title: "Meet suppliers",
+    desc: "Wholesale market visits, factory visits, showroom visits, sample checks, and price discussions.",
+  },
+  {
+    icon: PackageCheck,
+    title: "Source and ship",
+    desc: "Remote product sourcing, warehouse receiving, inspection, consolidation, and delivery to Ghana.",
+  },
+];
+
 const movingImages = [
   heroImg,
   cityImg,
@@ -98,6 +127,17 @@ const movingImages = [
   showcase2,
   showcase3,
   showcase4,
+  photo4,
+  photo5,
+  photo6,
+  photo7,
+  photo10,
+  photo11,
+  photo12,
+  photo13,
+  photo14,
+  photo15,
+  photo16,
 ];
 
 export const Route = createFileRoute("/sourcing")({
@@ -189,6 +229,28 @@ function ComingToChinaPage() {
               className="h-36 w-56 rounded-3xl object-cover shadow-sm sm:h-44 sm:w-72"
             />
           ))}
+        </div>
+      </section>
+
+      <section className="bg-white px-6 py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 max-w-3xl">
+            <p className="text-xs font-bold tracking-widest text-brand uppercase">
+              What VoltCargo arranges
+            </p>
+            <h2 className="mt-3 text-4xl font-black tracking-tight lg:text-5xl">
+              One page for travelling to China, buying in China, and shipping to Ghana.
+            </h2>
+            <p className="mt-4 text-lg leading-relaxed text-navy/55">
+              Clients can use this service whether they want to physically come to China or ask
+              VoltCargo to source products on their behalf.
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {serviceGroups.map((service) => (
+              <ServiceGroupCard key={service.title} {...service} />
+            ))}
+          </div>
         </div>
       </section>
 
@@ -384,6 +446,27 @@ function ComingToChinaPage() {
       </section>
 
       <SiteFooter />
+    </div>
+  );
+}
+
+function ServiceGroupCard({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-[2rem] border border-navy/5 bg-surface p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-navy/10">
+      <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-brand/10 blur-2xl" />
+      <div className="relative mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white">
+        <Icon className="h-7 w-7" />
+      </div>
+      <h3 className="relative text-2xl font-black">{title}</h3>
+      <p className="relative mt-3 text-sm leading-relaxed text-navy/55">{desc}</p>
     </div>
   );
 }
