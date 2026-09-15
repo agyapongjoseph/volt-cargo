@@ -61,21 +61,26 @@ Deno.serve(async (req: Request) => {
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload) return json({ error: "Hubtel status check failed" }, 400);
 
-  const isPaid = payload?.data?.status === "Paid";
+  const status =
+    payload?.data?.status ?? payload?.Data?.Status ?? payload?.status ?? payload?.Status;
+  const isPaid = status === "Paid" || status === "Success";
+  const update: Record<string, unknown> = {
+    hubtel_callback: payload,
+    hubtel_transaction_id: payload?.data?.transactionId ?? payload?.Data?.TransactionId ?? null,
+  };
+
   if (isPaid && !invoice.paid) {
-    const { error: updateError } = await adminClient
-      .from("invoices")
-      .update({
-        paid: true,
-        paid_at: payload.data.date ?? new Date().toISOString(),
-        hubtel_transaction_id: payload.data.transactionId ?? null,
-        hubtel_callback: payload,
-      })
-      .eq("invoice_code", invoice.invoice_code);
-    if (updateError) return json({ error: updateError.message }, 500);
+    update.paid = true;
+    update.paid_at = payload.data?.date ?? payload.Data?.PaymentDate ?? new Date().toISOString();
   }
 
-  return json({ paid: isPaid, status: payload?.data?.status, payload });
+  const { error: updateError } = await adminClient
+    .from("invoices")
+    .update(update)
+    .eq("invoice_code", invoice.invoice_code);
+  if (updateError) return json({ error: updateError.message }, 500);
+
+  return json({ paid: isPaid, status, payload });
 });
 
 function json(body: unknown, status = 200) {
