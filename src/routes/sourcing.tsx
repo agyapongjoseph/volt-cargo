@@ -166,7 +166,7 @@ function ComingToChinaPage() {
         <div className="absolute inset-0 opacity-25">
           <img src={cityImg} alt="China city skyline" className="h-full w-full object-cover" />
         </div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,97,175,0.55),transparent_32%),linear-gradient(120deg,rgba(11,18,33,0.98),rgba(11,18,33,0.62))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(0,173,238,0.55),transparent_32%),linear-gradient(120deg,rgba(11,18,33,0.98),rgba(11,18,33,0.62))]" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="animate-fade-up">
             <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-bold tracking-widest text-white uppercase backdrop-blur">

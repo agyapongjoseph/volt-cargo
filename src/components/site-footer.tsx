@@ -5,9 +5,9 @@ export function SiteFooter() {
         <div className="grid gap-12 border-b border-white/10 pb-20 md:grid-cols-4">
           <div className="col-span-2">
             <img
-              src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He"
+              src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9ZEFu1DmoRclbA82Lug3IwkXPUyhse6Exip7a"
               alt="Logo"
-              className="h-9 w-28 mb-4 flex items-center"
+              className="mb-4 h-9 w-auto max-w-[160px] object-contain"
             />
             <p className="mb-8 max-w-sm text-white/60">
               VoltCargo is building the future of African logistics. We connect global supply chains

@@ -17,9 +17,9 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-8">
           <img
-            src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He"
+            src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9B8lCzKMZMkUVq204AbIvTDY3u51HleP9Sat7"
             alt="Logo"
-            className="h-7 w-21"
+            className="h-7 w-auto max-w-[140px] object-contain"
           />
           <div className="hidden items-center gap-6 text-sm font-medium text-navy/60 md:flex">
             {links.map((l) => (

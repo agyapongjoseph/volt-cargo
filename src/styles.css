@@ -1,14 +1,34 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 
+
+@font-face {
+  font-family: "Campton";
+  src: url("/fonts/CamptonMedium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Campton";
+  src: url("/fonts/CamptonSemiBold.otf") format("opentype");
+  font-weight: 600 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-brand: #0061af;
+  --font-sans: "Campton", "Inter Variable", ui-sans-serif, system-ui, -apple-system,"Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  --font-primary: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-button: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand: #00adee;
   --color-brand-foreground: #ffffff;
   --color-navy: #0b1221;
   --color-surface: #f8fafc;
-  --color-accent-green: #22c55e;
+  --color-accent-green: #38ee00;
   --color-accent-orange: #f97316;
   --color-accent-red: #ef4444;
 }
@@ -179,7 +199,7 @@
   --ring: oklch(0.551 0.027 264.364);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-3: oklch(0.646 0.222 41.116);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.208 0.042 265.755);
@@ -193,12 +213,23 @@
 }
 
 @layer base {
-  * {
-    border-color: var(--color-border);
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-primary);
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
-  body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+  button,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .font-button {
+    font-family: var(--font-button);
+    font-weight: 600;
   }
 }

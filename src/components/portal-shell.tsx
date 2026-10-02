@@ -148,9 +148,9 @@ export function PortalShell({
       >
         <div className="flex h-16 items-center justify-between border-b border-navy/5 px-5">
           <img
-            src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He"
+            src="https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9B8lCzKMZMkUVq204AbIvTDY3u51HleP9Sat7"
             alt="Logo"
-            className="h-8 w-25"
+            className="h-8 w-auto max-w-[150px] object-contain"
           />
         </div>
 

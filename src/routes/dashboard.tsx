@@ -17,7 +17,7 @@ import { Plus, Search, Download, X, CheckCircle2, MapPin, Copy } from "lucide-re
 import { cn } from "@/lib/utils";
 
 const voltCargoLogo =
-  "https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9Q1BoILwrQF0SXWVDEYMIpjnctyT1kBl8z3He";
+  "https://9q2eejtmhi.ufs.sh/f/d8EdUjADIce9B8lCzKMZMkUVq204AbIvTDY3u51HleP9Sat7";
 
 const warehouseAddresses = {
   "Air Freight": [
